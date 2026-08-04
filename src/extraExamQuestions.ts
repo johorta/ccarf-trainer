@@ -97,7 +97,7 @@ export const extraExamQuestions: Question[] = [
     ],
     answer: 2,
     explanationEs: 'Los tests existentes, fixtures, comportamientos esperados y casos límite permiten generar pruebas consistentes y útiles. Pedir cantidad sin contexto favorece aserciones triviales.',
-    vocabulary: { legacy: 'heredado/antiguo', failure: 'fallo', edge case: 'caso límite' },
+    vocabulary: { legacy: 'heredado/antiguo', failure: 'fallo', 'edge case': 'caso límite' },
   },
   {
     id: 'q23',
@@ -195,7 +195,7 @@ export const extraExamQuestions: Question[] = [
     ],
     answer: 1,
     explanationEs: 'El agente de síntesis debe recibir solo las herramientas necesarias para leer resultados y producir el informe. Esto reduce complejidad y acciones fuera de rol.',
-    vocabulary: { assignment: 'asignación', least privilege: 'mínimo privilegio', required: 'requerido' },
+    vocabulary: { assignment: 'asignación', 'least privilege': 'mínimo privilegio', required: 'requerido' },
   },
   {
     id: 'q30',
