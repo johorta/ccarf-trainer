@@ -4,6 +4,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/ccarf-trainer/',
+  build: {
+    rollupOptions: {
+      input: {
+        main: new URL('index.html', import.meta.url).pathname,
+        en: new URL('en/index.html', import.meta.url).pathname,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
