@@ -2,9 +2,20 @@ import { useMemo, useState } from 'react'
 import { questions, topics, type Question, type Topic } from './data'
 import { lessons, type LessonContent } from './lessons'
 import { buildExam, examConfigs, type ExamConfig } from './exams'
+import { calculateWeightedExamScore, type BlueprintDomainScore } from './scoring'
 
 type TopicScore = { answered: number; correct: number }
-type ExamAttempt = { examId: string; title: string; score: number; total: number; percentage: number; finishedAt: string }
+type ExamAttempt = {
+  examId: string
+  title: string
+  score: number
+  total: number
+  percentage: number
+  estimatedPoints?: number
+  rawPercentage?: number
+  domainScores?: BlueprintDomainScore[]
+  finishedAt: string
+}
 type Progress = {
   answered: number
   correct: number
@@ -104,14 +115,24 @@ function App() {
   }
   function finishExam() {
     if (!activeExam) return
-    const score = examQuestions.filter((q) => examAnswers[q.id] === q.answer).length
-    const result: ExamAttempt = { examId: activeExam.id, title: activeExam.title, score, total: examQuestions.length, percentage: Math.round(score / examQuestions.length * 100), finishedAt: new Date().toISOString() }
+    const weightedScore = calculateWeightedExamScore(examQuestions, examAnswers)
+    const result: ExamAttempt = {
+      examId: activeExam.id,
+      title: activeExam.title,
+      score: weightedScore.rawCorrect,
+      total: weightedScore.total,
+      percentage: weightedScore.weightedPercentage,
+      estimatedPoints: weightedScore.estimatedPoints,
+      rawPercentage: weightedScore.rawPercentage,
+      domainScores: weightedScore.domains,
+      finishedAt: new Date().toISOString(),
+    }
     const byTopic = { ...progress.byTopic }
     examQuestions.forEach((q) => {
       const old = byTopic[q.topicId] ?? { answered: 0, correct: 0 }
       byTopic[q.topicId] = { answered: old.answered + 1, correct: old.correct + (examAnswers[q.id] === q.answer ? 1 : 0) }
     })
-    persist({ ...progress, answered: progress.answered + examQuestions.length, correct: progress.correct + score, byTopic, examAttempts: [...progress.examAttempts, result] })
+    persist({ ...progress, answered: progress.answered + examQuestions.length, correct: progress.correct + weightedScore.rawCorrect, byTopic, examAttempts: [...progress.examAttempts, result] })
     setExamResult(result)
   }
 
@@ -163,13 +184,13 @@ function App() {
 
     {view === 'practice' && current && <section className="quiz-card"><div className="topic-label">{topics.find((topic) => topic.id === current.topicId)?.name}</div><h2>{current.prompt}</h2><div className="options">{current.options.map((option, index) => <button key={option} className={`option ${selected === index ? 'selected' : ''} ${checked && index === current.answer ? 'correct' : ''} ${checked && selected === index && index !== current.answer ? 'wrong' : ''}`} onClick={() => !checked && setSelected(index)}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}</div>{!checked ? <button className="primary" disabled={selected === null} onClick={submitPractice}>Confirmar respuesta</button> : <div className="feedback"><h3>{selected === current.answer ? 'Correcta' : 'Incorrecta'}</h3><p>{current.explanationEs}</p>{selected !== current.answer && <button className="secondary" onClick={() => openTopic(topics.find((topic) => topic.id === current.topicId)!)}>Repasar lección</button>}<button className="primary" onClick={nextPractice}>Siguiente pregunta</button></div>}</section>}
 
-    {view === 'exams' && !activeExam && <section><div className="section-title"><div><span className="eyebrow">SIMULADORES</span><h1>Exámenes de prueba</h1><p>Todos mezclan Agentic Architecture, Claude Code, Claude API y MCP & Tool Use.</p></div></div><div className="exam-grid">{examConfigs.map((exam) => <article className="exam-card" key={exam.id}><span className="exam-level">{exam.difficulty}</span><h2>{exam.title}</h2><p>{exam.description}</p><div className="exam-meta"><span>{exam.questionCount} preguntas</span><span>{exam.durationMinutes} min</span></div><button className="primary" onClick={() => startExam(exam)}>Comenzar examen</button></article>)}</div></section>}
+    {view === 'exams' && !activeExam && <section><div className="section-title"><div><span className="eyebrow">SIMULADORES</span><h1>Exámenes de prueba</h1><p>El resultado pondera Agentic Architecture 27%, Claude Code 20%, Prompt Engineering 20%, Tool Design & MCP 18% y Context Management 15%.</p></div></div><div className="exam-grid">{examConfigs.map((exam) => <article className="exam-card" key={exam.id}><span className="exam-level">{exam.difficulty}</span><h2>{exam.title}</h2><p>{exam.description}</p><div className="exam-meta"><span>{exam.questionCount} preguntas</span><span>{exam.durationMinutes} min</span></div><button className="primary" onClick={() => startExam(exam)}>Comenzar examen</button></article>)}</div></section>}
 
     {view === 'exams' && activeExam && !examResult && examQuestion && <section className="quiz-card exam-session"><div className="exam-header"><div><span className="eyebrow">{activeExam.title}</span><h2>Pregunta {examIndex + 1} de {examQuestions.length}</h2></div><span>{activeExam.durationMinutes} min sugeridos</span></div><div className="progress"><div style={{ width: `${(examIndex + 1) / examQuestions.length * 100}%` }} /></div><h2>{examQuestion.prompt}</h2><div className="options">{examQuestion.options.map((option, index) => <button key={option} className={`option ${examAnswers[examQuestion.id] === index ? 'selected' : ''}`} onClick={() => setExamAnswers({ ...examAnswers, [examQuestion.id]: index })}><span>{String.fromCharCode(65 + index)}</span>{option}</button>)}</div><div className="exam-nav"><button className="secondary" disabled={examIndex === 0} onClick={() => setExamIndex(examIndex - 1)}>Anterior</button>{examIndex < examQuestions.length - 1 ? <button className="primary" disabled={examAnswers[examQuestion.id] === undefined} onClick={() => setExamIndex(examIndex + 1)}>Siguiente</button> : <button className="primary" disabled={Object.keys(examAnswers).length < examQuestions.length} onClick={finishExam}>Finalizar examen</button>}</div></section>}
 
-    {view === 'exams' && examResult && <section className="result-card"><span className="eyebrow">RESULTADO</span><h1>{examResult.percentage}%</h1><h2>{examResult.score}/{examResult.total} respuestas correctas</h2><p>{examResult.percentage >= 72 ? 'Resultado de práctica sobre el umbral de referencia.' : 'Conviene reforzar las lecciones asociadas a las preguntas falladas.'}</p><div className="result-review">{examQuestions.map((q, index) => <article key={q.id}><strong>Pregunta {index + 1}: {examAnswers[q.id] === q.answer ? 'Correcta' : 'Incorrecta'}</strong><p>{q.explanationEs}</p></article>)}</div><button className="primary" onClick={() => { setActiveExam(null); setExamResult(null) }}>Volver a simuladores</button></section>}
+    {view === 'exams' && examResult && <section className="result-card"><span className="eyebrow">RESULTADO PONDERADO</span><h1>{examResult.estimatedPoints ?? Math.round(examResult.percentage * 10)}/1000</h1><h2>{examResult.percentage}% ponderado · {examResult.score}/{examResult.total} respuestas correctas</h2><p>Precisión sin ponderar: {examResult.rawPercentage ?? Math.round(examResult.score / examResult.total * 100)}%</p><p>{(examResult.estimatedPoints ?? examResult.percentage * 10) >= 720 ? 'Resultado de práctica sobre el umbral de referencia.' : 'Conviene reforzar los dominios con menor aporte ponderado.'}</p>{examResult.domainScores && <div className="result-review">{examResult.domainScores.map((domain) => <article key={domain.id}><strong>{domain.title} — peso {domain.weight}%</strong><p>{domain.correct}/{domain.total} correctas · {domain.accuracy}% en el dominio · aporta {domain.weightedContribution} puntos porcentuales</p></article>)}</div>}<div className="result-review">{examQuestions.map((q, index) => <article key={q.id}><strong>Pregunta {index + 1}: {examAnswers[q.id] === q.answer ? 'Correcta' : 'Incorrecta'}</strong><p>{q.explanationEs}</p></article>)}</div><button className="primary" onClick={() => { setActiveExam(null); setExamResult(null) }}>Volver a simuladores</button></section>}
 
-    {view === 'progress' && <section><div className="section-title"><div><span className="eyebrow">PROGRESO</span><h1>Historial y desempeño</h1></div><button className="secondary" onClick={exportProgress}>Exportar JSON</button></div><section className="stats"><article><strong>{progress.completedLessons.length}/{topics.length}</strong><span>Lecciones</span></article><article><strong>{accuracy}%</strong><span>Precisión global</span></article><article><strong>{progress.examAttempts.length}</strong><span>Exámenes rendidos</span></article></section><div className="attempt-list">{progress.examAttempts.length === 0 ? <p>Aún no has completado simuladores.</p> : progress.examAttempts.slice().reverse().map((attempt) => <article key={`${attempt.examId}-${attempt.finishedAt}`}><div><strong>{attempt.title}</strong><span>{new Date(attempt.finishedAt).toLocaleString()}</span></div><b>{attempt.percentage}%</b></article>)}</div></section>}
+    {view === 'progress' && <section><div className="section-title"><div><span className="eyebrow">PROGRESO</span><h1>Historial y desempeño</h1></div><button className="secondary" onClick={exportProgress}>Exportar JSON</button></div><section className="stats"><article><strong>{progress.completedLessons.length}/{topics.length}</strong><span>Lecciones</span></article><article><strong>{accuracy}%</strong><span>Precisión global</span></article><article><strong>{progress.examAttempts.length}</strong><span>Exámenes rendidos</span></article></section><div className="attempt-list">{progress.examAttempts.length === 0 ? <p>Aún no has completado simuladores.</p> : progress.examAttempts.slice().reverse().map((attempt) => <article key={`${attempt.examId}-${attempt.finishedAt}`}><div><strong>{attempt.title}</strong><span>{new Date(attempt.finishedAt).toLocaleString()}</span></div><b>{attempt.estimatedPoints !== undefined ? `${attempt.estimatedPoints}/1000` : `${attempt.percentage}%`}</b></article>)}</div></section>}
   </main>
 }
 
