@@ -27,3 +27,11 @@ questions.push(
   ...claudeCodeQuestionsPart2,
   ...claudeCodeQuestionsPart3,
 )
+
+const loadedMemoryQuestion = questions.find((question) => question.id === 'q95')
+if (loadedMemoryQuestion) {
+  loadedMemoryQuestion.prompt = 'Which Claude Code command is MOST useful for inspecting the currently loaded memory files in the context?'
+  loadedMemoryQuestion.options = ['/context', '/deploy', '/temperature', '/fork-all']
+  loadedMemoryQuestion.answer = 0
+  loadedMemoryQuestion.explanationEs = 'El comando /context muestra los archivos de memoria cargados dentro del contexto de la sesión. /memory se utiliza para visualizar y editar la configuración de memoria.'
+}
