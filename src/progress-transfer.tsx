@@ -81,15 +81,21 @@ function fromBase64Url(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  return copy.buffer
+}
+
 async function compress(bytes: Uint8Array) {
   if (typeof CompressionStream === 'undefined') return null
-  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))
+  const stream = new Blob([toArrayBuffer(bytes)]).stream().pipeThrough(new CompressionStream('deflate-raw'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
 async function decompress(bytes: Uint8Array) {
   if (typeof DecompressionStream === 'undefined') throw new Error('Compression is not supported by this browser')
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+  const stream = new Blob([toArrayBuffer(bytes)]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
