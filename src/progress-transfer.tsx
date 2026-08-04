@@ -25,6 +25,11 @@ type ProgressTransferProps = {
   onImport: (progress: TransferProgress) => void
 }
 
+type StoredProgressTransferProps = {
+  locale: 'es' | 'en'
+  storageKey: string
+}
+
 const text = {
   es: {
     eyebrow: 'TRANSFERENCIA ENTRE DISPOSITIVOS',
@@ -42,6 +47,7 @@ const text = {
     imported: 'Progreso importado correctamente.',
     invalid: 'El enlace de transferencia no es válido o está dañado.',
     tooLarge: 'El progreso es demasiado grande para un QR. Reduce el historial de práctica o usa la exportación JSON.',
+    launcher: 'Transferir progreso por QR',
   },
   en: {
     eyebrow: 'DEVICE-TO-DEVICE TRANSFER',
@@ -59,6 +65,7 @@ const text = {
     imported: 'Progress imported successfully.',
     invalid: 'The transfer link is invalid or damaged.',
     tooLarge: 'The progress payload is too large for a QR code. Reduce practice history or use JSON export.',
+    launcher: 'Transfer progress by QR',
   },
 } as const
 
@@ -132,6 +139,21 @@ function transferValueFromHash() {
 
 function clearTransferHash() {
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+}
+
+function safeStoredProgress(storageKey: string): TransferProgress {
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as Partial<TransferProgress>
+    return {
+      answered: Math.max(0, Number(stored.answered) || 0),
+      correct: Math.max(0, Number(stored.correct) || 0),
+      byTopic: stored.byTopic ?? {},
+      completedLessons: stored.completedLessons ?? [],
+      lastTopicId: stored.lastTopicId,
+    }
+  } catch {
+    return { answered: 0, correct: 0, byTopic: {}, completedLessons: [] }
+  }
 }
 
 export default function ProgressTransfer({ locale, progress, onImport }: ProgressTransferProps) {
@@ -217,5 +239,49 @@ export default function ProgressTransfer({ locale, progress, onImport }: Progres
         </div>
       )}
     </article>
+  )
+}
+
+export function StoredProgressTransfer({ locale, storageKey }: StoredProgressTransferProps) {
+  const labels = text[locale]
+  const [open, setOpen] = useState(() => Boolean(transferValueFromHash()))
+  const [progress, setProgress] = useState(() => safeStoredProgress(storageKey))
+
+  function importStoredProgress(incoming: TransferProgress) {
+    let stored: Record<string, unknown> = {}
+    try {
+      stored = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as Record<string, unknown>
+    } catch {
+      stored = {}
+    }
+    localStorage.setItem(storageKey, JSON.stringify({
+      ...stored,
+      ...incoming,
+      examAttempts: Array.isArray(stored.examAttempts) ? stored.examAttempts : [],
+    }))
+    setProgress(incoming)
+    clearTransferHash()
+    window.location.reload()
+  }
+
+  function close() {
+    setOpen(false)
+    if (transferValueFromHash()) clearTransferHash()
+  }
+
+  return (
+    <>
+      <button className="transfer-launcher" onClick={() => { setProgress(safeStoredProgress(storageKey)); setOpen(true) }} aria-label={labels.launcher}>
+        <span aria-hidden="true">▦</span>{labels.launcher}
+      </button>
+      {open && (
+        <div className="transfer-drawer" role="dialog" aria-modal="true" aria-label={labels.title}>
+          <div className="transfer-drawer-content">
+            <button className="transfer-drawer-close" onClick={close} aria-label={labels.close}>×</button>
+            <ProgressTransfer locale={locale} progress={progress} onImport={importStoredProgress} />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
