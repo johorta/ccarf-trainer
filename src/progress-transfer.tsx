@@ -30,13 +30,17 @@ type StoredProgressTransferProps = {
   storageKey: string
 }
 
+type TransferAction = 'qr' | 'copy' | 'share'
+
 const text = {
   es: {
     eyebrow: 'TRANSFERENCIA ENTRE DISPOSITIVOS',
-    title: 'Pasar progreso con QR',
-    description: 'Genera un QR en este dispositivo y escanéalo con el otro. Se transfieren lecciones y práctica, pero no el historial de simuladores.',
+    title: 'Pasar progreso a otro dispositivo',
+    description: 'Genera un QR, copia el enlace o compártelo desde el celular. Se transfieren lecciones y práctica, pero no el historial de simuladores.',
     generate: 'Generar código QR',
-    generating: 'Generando…',
+    copy: 'Copiar enlace',
+    share: 'Compartir enlace',
+    working: 'Preparando…',
     close: 'Cerrar',
     scanTitle: 'Escanea este código',
     scanHelp: 'Abre la cámara del celular, escanea el QR y confirma la importación en la página que se abrirá.',
@@ -45,16 +49,24 @@ const text = {
     import: 'Importar progreso',
     cancel: 'Cancelar',
     imported: 'Progreso importado correctamente.',
+    copied: 'Enlace copiado. Envíatelo por WhatsApp, correo o la aplicación que prefieras.',
+    shared: 'Enlace de progreso compartido.',
+    shareFallback: 'Este navegador no permite compartir directamente; el enlace se copió al portapapeles.',
     invalid: 'El enlace de transferencia no es válido o está dañado.',
-    tooLarge: 'El progreso es demasiado grande para un QR. Reduce el historial de práctica o usa la exportación JSON.',
-    launcher: 'Transferir progreso por QR',
+    tooLarge: 'El progreso es demasiado grande para un enlace QR. Usa la exportación JSON.',
+    failed: 'No fue posible preparar o copiar el enlace. Revisa los permisos del navegador e inténtalo nuevamente.',
+    launcher: 'Transferir progreso',
+    shareTitle: 'Progreso CCAR-F Trainer',
+    shareText: 'Abre este enlace para importar mi progreso de estudio en CCAR-F Trainer.',
   },
   en: {
     eyebrow: 'DEVICE-TO-DEVICE TRANSFER',
-    title: 'Transfer progress with QR',
-    description: 'Generate a QR code on this device and scan it with another one. Lessons and practice progress are transferred; mock-exam history is not.',
+    title: 'Transfer progress to another device',
+    description: 'Generate a QR code, copy the link, or share it from your phone. Lessons and practice progress are transferred; mock-exam history is not.',
     generate: 'Generate QR code',
-    generating: 'Generating…',
+    copy: 'Copy link',
+    share: 'Share link',
+    working: 'Preparing…',
     close: 'Close',
     scanTitle: 'Scan this code',
     scanHelp: 'Open the phone camera, scan the QR code, and confirm the import on the page that opens.',
@@ -63,9 +75,15 @@ const text = {
     import: 'Import progress',
     cancel: 'Cancel',
     imported: 'Progress imported successfully.',
+    copied: 'Link copied. Send it to yourself through email, messaging, or another app.',
+    shared: 'Progress link shared.',
+    shareFallback: 'Direct sharing is unavailable in this browser, so the link was copied to the clipboard.',
     invalid: 'The transfer link is invalid or damaged.',
-    tooLarge: 'The progress payload is too large for a QR code. Reduce practice history or use JSON export.',
-    launcher: 'Transfer progress by QR',
+    tooLarge: 'The progress payload is too large for a QR link. Use JSON export instead.',
+    failed: 'The transfer link could not be prepared or copied. Check browser permissions and try again.',
+    launcher: 'Transfer progress',
+    shareTitle: 'CCAR-F Trainer progress',
+    shareText: 'Open this link to import my study progress into CCAR-F Trainer.',
   },
 } as const
 
@@ -162,12 +180,30 @@ function safeStoredProgress(storageKey: string): TransferProgress {
   }
 }
 
+async function copyToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  textarea.remove()
+  if (!copied) throw new Error('Clipboard unavailable')
+}
+
 export default function ProgressTransfer({ locale, progress, onImport }: ProgressTransferProps) {
   const labels = text[locale]
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [incoming, setIncoming] = useState<TransferProgress | null>(null)
   const [status, setStatus] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
+  const [busyAction, setBusyAction] = useState<TransferAction | null>(null)
 
   useEffect(() => {
     const transferValue = transferValueFromHash()
@@ -177,18 +213,39 @@ export default function ProgressTransfer({ locale, progress, onImport }: Progres
       .catch(() => setStatus(labels.invalid))
   }, [labels.invalid])
 
-  async function generateQr() {
-    setGenerating(true)
+  async function createTransferUrl() {
+    const payload = await encode(progress, locale)
+    const transferUrl = `${window.location.origin}${window.location.pathname}#/transfer/${payload}`
+    if (transferUrl.length > 2600) throw new Error('PAYLOAD_TOO_LARGE')
+    return transferUrl
+  }
+
+  async function runTransferAction(action: TransferAction) {
+    setBusyAction(action)
     setStatus(null)
     try {
-      const payload = await encode(progress, locale)
-      const transferUrl = `${window.location.origin}${window.location.pathname}#/transfer/${payload}`
-      if (transferUrl.length > 2600) throw new Error('Payload too large')
-      setQrUrl(await QRCode.toDataURL(transferUrl, { errorCorrectionLevel: 'M', margin: 2, width: 360 }))
-    } catch {
-      setStatus(labels.tooLarge)
+      const transferUrl = await createTransferUrl()
+      if (action === 'qr') {
+        setQrUrl(await QRCode.toDataURL(transferUrl, { errorCorrectionLevel: 'M', margin: 2, width: 360 }))
+      } else if (action === 'copy') {
+        await copyToClipboard(transferUrl)
+        setStatus(labels.copied)
+      } else if (navigator.share) {
+        try {
+          await navigator.share({ title: labels.shareTitle, text: labels.shareText, url: transferUrl })
+          setStatus(labels.shared)
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          throw error
+        }
+      } else {
+        await copyToClipboard(transferUrl)
+        setStatus(labels.shareFallback)
+      }
+    } catch (error) {
+      setStatus(error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE' ? labels.tooLarge : labels.failed)
     } finally {
-      setGenerating(false)
+      setBusyAction(null)
     }
   }
 
@@ -210,7 +267,17 @@ export default function ProgressTransfer({ locale, progress, onImport }: Progres
       <span className="eyebrow">{labels.eyebrow}</span>
       <h2>{labels.title}</h2>
       <p>{labels.description}</p>
-      <button className="primary" onClick={generateQr} disabled={generating}>{generating ? labels.generating : labels.generate}</button>
+      <div className="transfer-methods">
+        <button className="primary" onClick={() => runTransferAction('qr')} disabled={busyAction !== null}>
+          {busyAction === 'qr' ? labels.working : labels.generate}
+        </button>
+        <button className="secondary" onClick={() => runTransferAction('copy')} disabled={busyAction !== null}>
+          {busyAction === 'copy' ? labels.working : labels.copy}
+        </button>
+        <button className="secondary" onClick={() => runTransferAction('share')} disabled={busyAction !== null}>
+          {busyAction === 'share' ? labels.working : labels.share}
+        </button>
+      </div>
       {status && <p className="transfer-status" role="status">{status}</p>}
 
       {qrUrl && (
@@ -228,7 +295,7 @@ export default function ProgressTransfer({ locale, progress, onImport }: Progres
       {incoming && (
         <div className="transfer-dialog" role="dialog" aria-modal="true" aria-label={labels.incomingTitle}>
           <div className="transfer-dialog-content">
-            <span className="eyebrow">QR</span>
+            <span className="eyebrow">TRANSFER</span>
             <h2>{labels.incomingTitle}</h2>
             <p>{labels.incomingHelp}</p>
             <div className="transfer-summary">
