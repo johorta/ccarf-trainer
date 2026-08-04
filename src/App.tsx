@@ -115,9 +115,24 @@ function App() {
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'ccarf-trainer-progress.json'; link.click(); URL.revokeObjectURL(link.href)
   }
 
-  const lastTopic = topics.find((topic) => topic.id === progress.lastTopicId) ?? topics.find((topic) => topic.priority === 'high') ?? topics[0]
+  const lastVisitedTopic = topics.find((topic) => topic.id === progress.lastTopicId)
+  const nextPendingTopic = topics.find((topic) => !progress.completedLessons.includes(topic.id))
+  const continueTopic = lastVisitedTopic && !progress.completedLessons.includes(lastVisitedTopic.id)
+    ? lastVisitedTopic
+    : nextPendingTopic ?? lastVisitedTopic ?? topics[0]
+  const courseComplete = progress.completedLessons.length === topics.length
   const filteredTopics = domainFilter === 'Todos' ? topics : topics.filter((topic) => topic.domain === domainFilter)
   const examQuestion = examQuestions[examIndex]
+
+  function continueCourse() {
+    if (courseComplete) {
+      setSelectedTopic(null)
+      setView('course')
+      window.scrollTo({ top: 0 })
+      return
+    }
+    openTopic(continueTopic)
+  }
 
   return <main className="shell">
     <nav className="top-nav">
@@ -132,9 +147,9 @@ function App() {
     </nav>
 
     {view === 'dashboard' && <>
-      <header className="hero"><div><span className="eyebrow">CURSO INTERACTIVO CCAR-F</span><h1>Estudia, practica y valida tu preparación.</h1><p>Contenido en español, preguntas en inglés y simuladores completos con todos los dominios.</p></div><div className="hero-actions"><button className="primary" onClick={() => openTopic(lastTopic)}>Continuar curso</button><button className="primary" onClick={() => setView('exams')}>Abrir simuladores</button></div></header>
+      <header className="hero"><div><span className="eyebrow">CURSO INTERACTIVO CCAR-F</span><h1>Estudia, practica y valida tu preparación.</h1><p>Contenido en español, preguntas en inglés y simuladores completos con todos los dominios.</p></div><div className="hero-actions"><button className="primary" onClick={continueCourse}>{courseComplete ? 'Ver curso completo' : 'Continuar curso'}</button><button className="primary" onClick={() => setView('exams')}>Abrir simuladores</button></div></header>
       <section className="stats"><article><strong>{coursePercent}%</strong><span>Curso completado</span></article><article><strong>{progress.answered}</strong><span>Preguntas respondidas</span></article><article><strong>{accuracy}%</strong><span>Precisión</span></article></section>
-      <section className="dashboard-grid"><article className="panel"><span className="eyebrow">SIGUIENTE LECCIÓN</span><h2>{lastTopic.name}</h2><p>{lastTopic.lesson}</p><button className="primary" onClick={() => openTopic(lastTopic)}>Abrir lección</button></article><article className="panel"><span className="eyebrow">EVALUACIÓN FINAL</span><h2>{examConfigs.length} simuladores</h2><p>Exámenes Foundation, Intermediate, Advanced y Final Readiness.</p><button className="secondary" onClick={() => setView('exams')}>Ver exámenes</button></article></section>
+      <section className="dashboard-grid"><article className="panel"><span className="eyebrow">{courseComplete ? 'CURSO COMPLETADO' : 'SIGUIENTE LECCIÓN'}</span><h2>{courseComplete ? 'Todas las lecciones están completadas' : continueTopic.name}</h2><p>{courseComplete ? 'Puedes volver al curso para repasar cualquier tema o reforzar los dominios con menor desempeño.' : continueTopic.lesson}</p><button className="primary" onClick={continueCourse}>{courseComplete ? 'Repasar curso' : 'Abrir lección'}</button></article><article className="panel"><span className="eyebrow">EVALUACIÓN FINAL</span><h2>{examConfigs.length} simuladores</h2><p>Exámenes Foundation, Intermediate, Advanced y Final Readiness.</p><button className="secondary" onClick={() => setView('exams')}>Ver exámenes</button></article></section>
     </>}
 
     {view === 'course' && !selectedTopic && <section><div className="section-title"><div><span className="eyebrow">CURSO COMPLETO</span><h1>Dominios y lecciones</h1></div><button className="secondary" onClick={exportProgress}>Exportar progreso</button></div><div className="filter-row">{domains.map((domain) => <button key={domain} className={domainFilter === domain ? 'filter active' : 'filter'} onClick={() => setDomainFilter(domain)}>{domain}</button>)}</div><div className="topic-grid">{filteredTopics.map((topic) => <article className={`topic-card clickable ${progress.completedLessons.includes(topic.id) ? 'completed' : ''}`} key={topic.id} onClick={() => openTopic(topic)}><div className="topic-meta"><div className={`priority ${topic.priority}`}>{topic.priority === 'high' ? 'Alta prioridad' : topic.priority === 'medium' ? 'Prioridad media' : 'Refuerzo'}</div><span>{topic.domain}</span></div><h3>{progress.completedLessons.includes(topic.id) ? '✓ ' : ''}{topic.name}</h3><p>{topic.lesson}</p><div className="score-row"><span>Dominio estimado</span><strong>{scoreFor(topic)}%</strong></div><div className="progress"><div style={{ width: `${scoreFor(topic)}%` }} /></div><div className="open-label">Abrir lección →</div></article>)}</div></section>}
