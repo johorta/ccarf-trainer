@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import './content-extension'
 import App from './App'
 import AppEnglish from './AppEnglish'
+import { StoredProgressTransfer } from './progress-transfer'
 import './styles.css'
 import './course.css'
 import './exams.css'
@@ -20,7 +21,13 @@ function Root() {
     return () => window.removeEventListener('hashchange', updateRoute)
   }, [])
 
-  return hash.startsWith('#/en') ? <AppEnglish /> : <App />
+  const englishRoute = hash.startsWith('#/en')
+  return (
+    <>
+      {englishRoute ? <AppEnglish /> : <App />}
+      {!englishRoute && <StoredProgressTransfer locale="es" storageKey="ccarf-trainer-progress-v2" />}
+    </>
+  )
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
