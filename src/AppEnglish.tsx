@@ -2,9 +2,29 @@ import { useMemo, useState } from 'react'
 import { questions, topics, type Question, type Topic } from './data'
 import { buildExam, examConfigs, type ExamConfig } from './exams'
 import { englishLessons } from './english-content'
+import ProgressTransfer, { type TransferProgress } from './progress-transfer'
 
-type View = 'home' | 'course' | 'practice' | 'exams'
+type View = 'home' | 'course' | 'practice' | 'exams' | 'progress'
 type ExamResult = { score: number; total: number; percentage: number }
+type TopicScore = { answered: number; correct: number }
+type EnglishProgress = TransferProgress
+
+const STORAGE_KEY = 'ccarf-trainer-progress-en-v1'
+const emptyProgress = (): EnglishProgress => ({ answered: 0, correct: 0, byTopic: {}, completedLessons: [] })
+
+function loadProgress(): EnglishProgress {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<EnglishProgress>
+    return {
+      ...emptyProgress(),
+      ...stored,
+      byTopic: stored.byTopic ?? {},
+      completedLessons: stored.completedLessons ?? [],
+    }
+  } catch {
+    return emptyProgress()
+  }
+}
 
 const examDescriptions: Record<string, string> = {
   foundation: 'A complete review focused on foundational concepts across all domains.',
@@ -20,6 +40,7 @@ function explanationFor(question: Question) {
 }
 
 function AppEnglish() {
+  const [progress, setProgress] = useState<EnglishProgress>(loadProgress)
   const [view, setView] = useState<View>('home')
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
   const [domainFilter, setDomainFilter] = useState('All')
@@ -35,11 +56,26 @@ function AppEnglish() {
   const domains = useMemo(() => ['All', ...Array.from(new Set(topics.map((topic) => topic.domain)))], [])
   const filteredTopics = domainFilter === 'All' ? topics : topics.filter((topic) => topic.domain === domainFilter)
   const examQuestion = examQuestions[examIndex]
+  const coursePercent = Math.round(progress.completedLessons.length / topics.length * 100)
+  const accuracy = progress.answered ? Math.round(progress.correct / progress.answered * 100) : 0
+
+  function persist(next: EnglishProgress) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    setProgress(next)
+  }
 
   function openTopic(topic: Topic) {
     setSelectedTopic(topic)
+    persist({ ...progress, lastTopicId: topic.id })
     setView('course')
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function toggleComplete(topicId: string) {
+    const completedLessons = progress.completedLessons.includes(topicId)
+      ? progress.completedLessons.filter((id) => id !== topicId)
+      : [...progress.completedLessons, topicId]
+    persist({ ...progress, completedLessons })
   }
 
   function startPractice(topicId?: string) {
@@ -50,6 +86,25 @@ function AppEnglish() {
     setChecked(false)
     setView('practice')
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function submitPractice() {
+    if (!current || selected === null || checked) return
+    const isCorrect = selected === current.answer
+    const old = progress.byTopic[current.topicId] ?? { answered: 0, correct: 0 }
+    persist({
+      ...progress,
+      answered: progress.answered + 1,
+      correct: progress.correct + (isCorrect ? 1 : 0),
+      byTopic: {
+        ...progress.byTopic,
+        [current.topicId]: {
+          answered: old.answered + 1,
+          correct: old.correct + (isCorrect ? 1 : 0),
+        } satisfies TopicScore,
+      },
+    })
+    setChecked(true)
   }
 
   function nextPractice() {
@@ -75,6 +130,17 @@ function AppEnglish() {
     setExamResult({ score, total: examQuestions.length, percentage: Math.round(score / examQuestions.length * 100) })
   }
 
+  function importProgress(incoming: TransferProgress) {
+    const validTopicIds = new Set(topics.map((topic) => topic.id))
+    persist({
+      answered: incoming.answered,
+      correct: Math.min(incoming.correct, incoming.answered),
+      byTopic: Object.fromEntries(Object.entries(incoming.byTopic).filter(([id]) => validTopicIds.has(id))),
+      completedLessons: incoming.completedLessons.filter((id) => validTopicIds.has(id)),
+      lastTopicId: incoming.lastTopicId && validTopicIds.has(incoming.lastTopicId) ? incoming.lastTopicId : undefined,
+    })
+  }
+
   function switchToSpanish() {
     window.location.hash = '#/'
   }
@@ -88,6 +154,7 @@ function AppEnglish() {
           <button className={view === 'course' ? 'active' : ''} onClick={() => { setSelectedTopic(null); setView('course') }}>Course</button>
           <button className={view === 'practice' ? 'active' : ''} onClick={() => startPractice()}>Practice</button>
           <button className={view === 'exams' ? 'active' : ''} onClick={() => { setActiveExam(null); setExamResult(null); setView('exams') }}>Mock exams</button>
+          <button className={view === 'progress' ? 'active' : ''} onClick={() => setView('progress')}>Progress</button>
           <button onClick={switchToSpanish}>Español</button>
         </div>
       </nav>
@@ -98,7 +165,7 @@ function AppEnglish() {
             <div>
               <span className="eyebrow">PUBLIC ENGLISH VERSION</span>
               <h1>Study the complete CCAR-F topic map.</h1>
-              <p>English lessons, English practice questions, and mock exams. This version does not store progress or exam history.</p>
+              <p>Course and practice progress stay on this device and can be transferred by QR. Mock-exam history is never stored.</p>
             </div>
             <div className="hero-actions">
               <button className="primary" onClick={() => { setSelectedTopic(null); setView('course') }}>Open course</button>
@@ -107,16 +174,16 @@ function AppEnglish() {
           </header>
 
           <section className="stats">
-            <article><strong>{topics.length}</strong><span>Course objectives</span></article>
-            <article><strong>{questions.length}</strong><span>Practice questions</span></article>
+            <article><strong>{coursePercent}%</strong><span>Course completed</span></article>
+            <article><strong>{progress.answered}</strong><span>Practice questions</span></article>
             <article><strong>0</strong><span>Stored exam attempts</span></article>
           </section>
 
           <section className="dashboard-grid">
             <article className="panel">
-              <span className="eyebrow">PRIVACY-FRIENDLY PRACTICE</span>
-              <h2>No personal exam history</h2>
-              <p>Answers and scores exist only in the current browser session. Reloading the page clears the current result.</p>
+              <span className="eyebrow">LOCAL LEARNING PROGRESS</span>
+              <h2>Continue on this device</h2>
+              <p>Completed lessons and practice accuracy are stored locally. Use the QR transfer to move them to another device.</p>
               <button className="primary" onClick={() => startPractice()}>Start practice</button>
             </article>
             <article className="panel">
@@ -135,7 +202,7 @@ function AppEnglish() {
             <div>
               <span className="eyebrow">COMPLETE COURSE</span>
               <h1>Domains and lessons</h1>
-              <p>This public version uses neutral coverage and does not expose personalized scores or priorities.</p>
+              <p>Lesson completion is stored locally and can be transferred by QR.</p>
             </div>
           </div>
           <div className="filter-row">
@@ -146,12 +213,13 @@ function AppEnglish() {
           <div className="topic-grid">
             {filteredTopics.map((topic) => {
               const lesson = englishLessons[topic.id]
+              const completed = progress.completedLessons.includes(topic.id)
               return (
-                <article className="topic-card clickable" key={topic.id} onClick={() => openTopic(topic)}>
+                <article className={`topic-card clickable ${completed ? 'completed' : ''}`} key={topic.id} onClick={() => openTopic(topic)}>
                   <div className="topic-meta"><div className="priority low">Course topic</div><span>{topic.domain}</span></div>
-                  <h3>{topic.name}</h3>
+                  <h3>{completed ? '✓ ' : ''}{topic.name}</h3>
                   <p>{lesson?.summary ?? topic.name}</p>
-                  <div className="lesson-card-meta"><span>Concepts</span><span>Exam guidance</span></div>
+                  <div className="lesson-card-meta"><span>{completed ? 'Completed' : 'Not completed'}</span><span>Exam guidance</span></div>
                   <div className="open-label">Open lesson →</div>
                 </article>
               )
@@ -162,6 +230,7 @@ function AppEnglish() {
 
       {view === 'course' && selectedTopic && (() => {
         const lesson = englishLessons[selectedTopic.id]
+        const completed = progress.completedLessons.includes(selectedTopic.id)
         return (
           <section className="lesson-page">
             <button className="back" onClick={() => setSelectedTopic(null)}>← Back to course</button>
@@ -190,6 +259,7 @@ function AppEnglish() {
                 <p>{lesson?.example}</p>
               </section>
               <div className="lesson-actions">
+                <button className="primary" onClick={() => toggleComplete(selectedTopic.id)}>{completed ? 'Mark as pending' : '✓ Complete lesson'}</button>
                 <button className="primary" onClick={() => startPractice(selectedTopic.id)}>Practice this topic</button>
                 <button className="secondary" onClick={() => setSelectedTopic(null)}>Back to all topics</button>
               </div>
@@ -210,7 +280,7 @@ function AppEnglish() {
             ))}
           </div>
           {!checked ? (
-            <button className="primary" disabled={selected === null} onClick={() => setChecked(true)}>Check answer</button>
+            <button className="primary" disabled={selected === null} onClick={submitPractice}>Check answer</button>
           ) : (
             <div className="feedback">
               <h3>{selected === current.answer ? 'Correct' : 'Incorrect'}</h3>
@@ -230,7 +300,7 @@ function AppEnglish() {
             <div>
               <span className="eyebrow">MOCK EXAMS</span>
               <h1>Session-only exam practice</h1>
-              <p>No attempts, answers, percentages, or timestamps are written to local storage.</p>
+              <p>No attempts, answers, percentages, or timestamps are written to local storage or transferred by QR.</p>
             </div>
           </div>
           <div className="exam-grid">
@@ -278,7 +348,7 @@ function AppEnglish() {
           <span className="eyebrow">CURRENT SESSION RESULT</span>
           <h1>{examResult.percentage}%</h1>
           <h2>{examResult.score}/{examResult.total} correct answers</h2>
-          <p>This result is not saved. Reloading or leaving this version clears it.</p>
+          <p>This result is not saved and is not included in QR transfers.</p>
           <div className="result-review">
             {examQuestions.map((question, index) => (
               <article key={question.id}>
@@ -288,6 +358,24 @@ function AppEnglish() {
             ))}
           </div>
           <button className="primary" onClick={() => { setActiveExam(null); setExamResult(null) }}>Back to mock exams</button>
+        </section>
+      )}
+
+      {view === 'progress' && (
+        <section>
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">PROGRESS</span>
+              <h1>Learning progress</h1>
+              <p>Stored only in this browser unless you transfer it using QR.</p>
+            </div>
+          </div>
+          <section className="stats">
+            <article><strong>{progress.completedLessons.length}/{topics.length}</strong><span>Completed lessons</span></article>
+            <article><strong>{progress.answered}</strong><span>Practice questions</span></article>
+            <article><strong>{accuracy}%</strong><span>Practice accuracy</span></article>
+          </section>
+          <ProgressTransfer locale="en" progress={progress} onImport={importProgress} />
         </section>
       )}
     </main>
