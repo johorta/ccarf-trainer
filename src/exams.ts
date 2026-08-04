@@ -1,4 +1,5 @@
 import type { Question } from './data'
+import { extraExamQuestions } from './extraExamQuestions'
 
 export type ExamConfig = {
   id: string
@@ -17,8 +18,9 @@ export const examConfigs: ExamConfig[] = [
 ]
 
 export function buildExam(config: ExamConfig, questions: Question[]): Question[] {
+  const questionBank = [...questions, ...extraExamQuestions]
   const byTopic = new Map<string, Question[]>()
-  questions.forEach((question) => {
+  questionBank.forEach((question) => {
     const list = byTopic.get(question.topicId) ?? []
     list.push(question)
     byTopic.set(question.topicId, list)
@@ -27,7 +29,7 @@ export function buildExam(config: ExamConfig, questions: Question[]): Question[]
   const interleaved: Question[] = []
   let index = 0
   const topicLists = [...byTopic.values()]
-  while (interleaved.length < questions.length) {
+  while (interleaved.length < questionBank.length) {
     topicLists.forEach((list) => {
       if (list[index]) interleaved.push(list[index])
     })
