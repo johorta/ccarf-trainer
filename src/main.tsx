@@ -25,7 +25,9 @@ function Root() {
   return (
     <>
       {englishRoute ? <AppEnglish /> : <App />}
-      {!englishRoute && <StoredProgressTransfer locale="es" storageKey="ccarf-trainer-progress-v2" />}
+      {englishRoute
+        ? <StoredProgressTransfer locale="en" storageKey="ccarf-trainer-progress-en-v1" />
+        : <StoredProgressTransfer locale="es" storageKey="ccarf-trainer-progress-v2" />}
     </>
   )
 }
