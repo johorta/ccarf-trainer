@@ -6,6 +6,7 @@ import AppEnglish from './AppEnglish'
 import './styles.css'
 import './course.css'
 import './exams.css'
+import './transfer.css'
 
 registerSW({ immediate: true })
 
