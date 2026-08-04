@@ -9,8 +9,20 @@ import './exams.css'
 
 registerSW({ immediate: true })
 
+function EnglishRoot() {
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#/') window.location.href = '/ccarf-trainer/'
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  return <AppEnglish />
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AppEnglish />
+    <EnglishRoot />
   </React.StrictMode>,
 )
