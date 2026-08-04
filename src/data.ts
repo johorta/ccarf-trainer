@@ -3,9 +3,14 @@ export type Priority = 'high' | 'medium' | 'low'
 export interface Topic {
   id: string
   name: string
+  domain: string
   reportScore: number
   priority: Priority
   lesson: string
+  keyPoints: string[]
+  traps: string[]
+  example: string
+  vocabulary: Record<string, string>
 }
 
 export interface Question {
@@ -18,98 +23,68 @@ export interface Question {
   vocabulary: Record<string, string>
 }
 
+const topic = (
+  id: string, name: string, domain: string, reportScore: number, lesson: string,
+  keyPoints: string[], traps: string[], example: string, vocabulary: Record<string,string>
+): Topic => ({ id, name, domain, reportScore, priority: reportScore <= 50 ? 'high' : reportScore < 100 ? 'medium' : 'low', lesson, keyPoints, traps, example, vocabulary })
+
 export const topics: Topic[] = [
-  { id: 'parallel', name: 'Multiple Tool Calls', reportScore: 0, priority: 'high', lesson: 'Tareas independientes pueden ejecutarse en paralelo; las dependientes deben ser secuenciales.' },
-  { id: 'subagent-prompts', name: 'Complete Subagent Prompts', reportScore: 0, priority: 'high', lesson: 'Incluye objetivo, hallazgos previos, datos estructurados, fuentes, restricciones y formato de salida.' },
-  { id: 'delegation', name: 'Goal-oriented vs Procedural Delegation', reportScore: 0, priority: 'high', lesson: 'Usa objetivos cuando el agente necesita adaptarse y procedimientos cuando el proceso debe ser rígido.' },
-  { id: 'state', name: 'State Persistence', reportScore: 0, priority: 'high', lesson: 'Guarda checkpoints, resultados, pendientes y referencias para poder reanudar sin repetir trabajo.' },
-  { id: 'structured', name: 'Structured Outputs', reportScore: 0, priority: 'high', lesson: 'Cuando el esquema es crítico, usa tool use con JSON Schema y tool_choice.' },
-  { id: 'batches', name: 'Messages API vs Message Batches', reportScore: 25, priority: 'high', lesson: 'Messages API para respuestas inmediatas; Batches para alto volumen asíncrono.' },
-  { id: 'schema', name: 'Optional, Nullable and Enum Schemas', reportScore: 33, priority: 'high', lesson: 'Representa ausencia o ambigüedad con optional, nullable y enums apropiados; no inventes valores.' },
-  { id: 'tools', name: 'Grep, Glob, Read and Bash', reportScore: 60, priority: 'medium', lesson: 'Glob encuentra rutas; Grep busca contenido; Read inspecciona archivos; Bash cubre operaciones de shell.' },
-  { id: 'mcp', name: 'MCP Resources vs Tools', reportScore: 100, priority: 'low', lesson: 'Resources exponen contenido; tools realizan acciones o consultas.' },
-  { id: 'context', name: 'Context Management', reportScore: 100, priority: 'low', lesson: 'Usa resúmenes, estado estructurado y retención selectiva para mantener sesiones largas.' },
+  topic('parallel','Multiple Tool Calls','Agentic Architecture',0,'Las tareas independientes deben ejecutarse en paralelo; las dependientes, en secuencia.', ['Una respuesta puede emitir varias tool calls.','El paralelismo reduce latencia total.','Una dependencia de datos obliga a secuenciar.'], ['Serializar tareas independientes “para reducir latencia”.','Ejecutar en paralelo llamadas donde una necesita el resultado de otra.'], 'Buscar clima, tipo de cambio y noticias son consultas independientes; se llaman juntas y luego se sintetizan.', { independent:'independiente', sequential:'secuencial', latency:'latencia' }),
+  topic('session-resumption','Session Resumption','Agentic Architecture',100,'Al reanudar una sesión se reutiliza el estado existente y se revisa solo lo que cambió.', ['Guardar hallazgos y decisiones previas.','Reanalizar archivos modificados.','Evitar comenzar desde cero.'], ['Volver a leer todo el repositorio sin necesidad.','Descartar hallazgos previos.'], 'Si cambiaron dos archivos, reanaliza esos dos e inyecta el estado guardado.', { resume:'reanudar', changed:'modificado', previous:'previo' }),
+  topic('subagent-prompts','Complete Subagent Prompts','Agentic Architecture',0,'El prompt del subagente debe ser autocontenido para que pueda terminar sin volver por contexto faltante.', ['Objetivo y criterios de éxito.','Hallazgos previos y datos estructurados.','Fuentes, restricciones y formato de salida.'], ['“Ask me if you need anything”.','Omitir fuentes o hallazgos ya conocidos.'], 'Incluye repositorio, rama, archivos, logs, hallazgos y el esquema de respuesta.', { findings:'hallazgos', source:'fuente', missing:'faltante' }),
+  topic('delegation','Goal-oriented vs Procedural Delegation','Agentic Architecture',0,'La delegación orientada a objetivos permite adaptación; la procedural exige pasos rígidos.', ['Objetivos para investigación y tareas abiertas.','Procedimientos para cumplimiento exacto.','Checkpoints mantienen visibilidad del coordinador.'], ['Confundir flexibilidad con falta de control.','Usar un procedimiento rígido cuando nuevos hallazgos deben cambiar el plan.'], '“Encuentra la causa y reporta hitos” es orientado a objetivo; “ejecuta exactamente estos pasos” es procedural.', { goal:'objetivo', procedural:'procedimental', checkpoint:'punto de control' }),
+  topic('subagent-tools','Subagent Tool Restrictions','Agentic Architecture',100,'Cada subagente recibe solo herramientas y contexto necesarios para su rol.', ['Principio de mínimo privilegio.','System prompt específico.','Contexto acotado.'], ['Dar todas las herramientas por comodidad.','Compartir permisos del coordinador sin necesidad.'], 'Un revisor de base de datos recibe lectura, no herramientas de modificación de código.', { restrict:'restringir', scope:'alcance', privilege:'privilegio' }),
+  topic('spawn-diagnostics','Subagent Spawning Diagnostics','Agentic Architecture',100,'Cuando un subagente no inicia, revisa definición, parámetros, permisos y wiring.', ['AgentDefinition correcta.','Herramientas autorizadas.','Parámetros y conexión coordinador-subagente.'], ['Culpar de inmediato al modelo.','Cambiar temperatura sin revisar configuración.'], 'Un agente que no puede usar Read probablemente tiene permisos o definición incorrectos.', { spawn:'iniciar/crear', wiring:'conexión', permission:'permiso' }),
+  topic('dynamic-decomposition','Dynamic Task Decomposition','Agentic Architecture',100,'El plan de subtareas debe adaptarse a nueva evidencia.', ['Revisar subtareas según resultados.','Crear nuevas líneas de investigación.','No repetir trabajo completado.'], ['Seguir un plan fijo pese a evidencia contradictoria.'], 'Un hallazgo legal inesperado genera una nueva subtarea de cumplimiento.', { evidence:'evidencia', revise:'revisar', midway:'a mitad' }),
+  topic('review-architecture','Plan Mode vs Direct vs Multi-phase','Agentic Architecture',0,'La arquitectura depende de riesgo, complejidad y necesidad de revisión.', ['Direct execution para tareas simples y reversibles.','Plan mode cuando conviene revisar antes de actuar.','Multi-phase para extracción, revisión, aprobación y ejecución separadas.'], ['Usar ejecución directa en cambios de producción sensibles.','Agregar fases innecesarias a tareas triviales.'], 'Un cambio de permisos productivos requiere plan y aprobación humana.', { approval:'aprobación', phase:'fase', reversible:'reversible' }),
+  topic('state','State Persistence','Agentic Architecture',0,'Persistir checkpoints permite reanudar pipelines sin perder trabajo.', ['Guardar tareas completadas y pendientes.','Persistir outputs y referencias.','Registrar errores y reintentos.'], ['Guardar solo el prompt original.','Confiar únicamente en el contexto del modelo.'], 'Tras una interrupción, el pipeline carga el último checkpoint y continúa con pendientes.', { persist:'persistir', pending:'pendiente', checkpoint:'punto de control' }),
+  topic('orchestration','Multi-agent Orchestration Patterns','Agentic Architecture',100,'Elige coordinator-worker, paralelo o secuencial según cobertura, latencia y dependencias.', ['Coordinator-worker distribuye y sintetiza.','Paralelo para tareas independientes.','Secuencial para dependencias.'], ['Elegir patrón por moda.','Paralelizar dependencias.'], 'Cuatro búsquedas paralelas entregan resultados a un agente de síntesis.', { pattern:'patrón', coverage:'cobertura', dependency:'dependencia' }),
+
+  topic('cicd','Claude Code CLI for CI/CD','Claude Code',0,'En CI/CD se usa ejecución no interactiva con límites y permisos restrictivos.', ['Modo no interactivo.','Límites de turnos y costo.','Salida estructurada y permisos mínimos.'], ['Ejecución ilimitada.','Permisos de escritura globales sin necesidad.'], 'Un job de CI limita turnos, costo y rutas modificables.', { noninteractive:'no interactivo', runaway:'fuera de control', limit:'límite' }),
+  topic('iterative','Iterative Refinement','Claude Code',100,'La mejora iterativa necesita feedback específico y ejemplos concretos.', ['Mostrar errores omitidos.','Dar salida esperada.','Agrupar problemas relacionados.'], ['“Do better”.','Cambiar muchas variables a la vez sin diagnóstico.'], 'Se entregan tres fallos no detectados y los criterios exactos infringidos.', { feedback:'retroalimentación', missed:'omitido', criteria:'criterios' }),
+  topic('review-config','Code Review Configuration','Claude Code',0,'La revisión automática debe cargar estándares del proyecto, restringir herramientas y devolver estructura consumible.', ['Reglas reales del repositorio.','Herramientas mínimas.','Salida estructurada.'], ['Prompt genérico sin convenciones.','Prosa libre cuando un sistema posterior consume el resultado.'], 'El revisor carga reglas Java del proyecto y retorna severidad, archivo, línea y evidencia.', { standard:'estándar', downstream:'posterior', severity:'severidad' }),
+  topic('context-fork','context: fork','Claude Code',100,'context: fork ejecuta una Skill o comando en un contexto aislado.', ['Evita contaminar la sesión principal.','Útil para tareas especializadas.','El resultado relevante vuelve al contexto principal.'], ['Usarlo cuando se necesita compartir cada detalle intermedio.'], 'Una auditoría extensa corre aislada y devuelve solo hallazgos.', { fork:'bifurcar/aislar', isolated:'aislado', contaminate:'contaminar' }),
+  topic('test-generation','Automated Test Generation','Claude Code',0,'Tests de calidad requieren contexto de fixtures, convenciones y comportamiento esperado.', ['Mostrar tests existentes.','Definir comportamientos y casos límite.','Evitar aserciones triviales.'], ['Pedir maximizar cantidad de tests.','Entregar solo el archivo fuente.'], 'Se proporcionan fixtures, estilo de nombres y criterios de cobertura conductual.', { fixture:'preparación de prueba', assertion:'aserción', edge case:'caso límite' }),
+  topic('configuration','Claude Code Configuration','Claude Code',100,'Cada mecanismo de configuración tiene un alcance diferente.', ['CLAUDE.md: guía persistente.','.claude/rules/: reglas por glob.','Skills: capacidades reutilizables; hooks: automatización; settings: permisos.'], ['Poner todas las reglas en un solo archivo global.'], 'Una regla solo para src/payments/**/*.java va en .claude/rules/ con glob.', { persistent:'persistente', glob:'patrón de ruta', hook:'gancho automático' }),
+  topic('exploration','Codebase Exploration','Claude Code',60,'Explora de forma incremental: localizar, buscar contenido y luego leer.', ['Glob encuentra archivos.','Grep encuentra texto.','Read inspecciona archivos relevantes.'], ['Leer todo el repositorio primero.','Usar Bash cuando existe una herramienta incorporada más precisa.'], 'Glob localiza YAML, Grep busca una clave y Read abre los candidatos.', { locate:'ubicar', occurrence:'aparición', narrow:'acotar' }),
+  topic('output-schema','Subagent Output Schemas','Claude Code',100,'El formato de salida se diseña para el consumidor posterior.', ['Datos estructurados para automatización.','Resumen en prosa para humanos.','Metadatos para trazabilidad.'], ['Elegir formato por preferencia estética.'], 'Un coordinador recibe findings estructurados, resumen y referencias.', { schema:'esquema', consumer:'consumidor', traceability:'trazabilidad' }),
+  topic('synthesis','Synthesis and Uncertainty','Claude Code',100,'La síntesis debe preservar desacuerdos e incertidumbre por fuente.', ['Identificar cada fuente.','No mezclar valores incompatibles.','Expresar confianza.'], ['Elegir una fuente arbitrariamente.','Promediar afirmaciones sin explicación.'], 'Dos reportes difieren; el resumen conserva ambas cifras y explica el conflicto.', { disagree:'no coincidir', uncertainty:'incertidumbre', preserve:'preservar' }),
+  topic('long-context','Long-session Context Management','Claude Code',100,'Las sesiones largas requieren aislamiento, scratchpads y lectura selectiva.', ['Guardar estado en archivos.','Usar subagentes aislados.','Reinyectar solo lo relevante.'], ['Mantener cada token para siempre.'], 'Una exploración guarda hallazgos en scratchpad y carga solo secciones necesarias.', { scratchpad:'bloc de trabajo', selective:'selectivo', retain:'conservar' }),
+  topic('context-optimization','Context Window Optimization','Claude Code',100,'Resumen, ventanas deslizantes y estado estructurado controlan el crecimiento del contexto.', ['Resumir historia antigua.','Retener decisiones y pendientes.','Descartar detalles irrelevantes.'], ['Repetir toda la conversación en cada turno.'], 'Se mantiene un objeto de estado compacto y un resumen actualizado.', { sliding window:'ventana deslizante', retention:'retención', compact:'compacto' }),
+
+  topic('human-review','Human Review Routing','Claude API',0,'La revisión humana se asigna por riesgo, confianza y ambigüedad.', ['Baja confianza.','Documentos inusuales.','Ambigüedad a nivel de campo.'], ['Muestreo aleatorio como única estrategia.','Revisar solo documentos cortos.'], 'Un estado ambiguo y un documento fuera de distribución se envían a revisión.', { route:'enrutar', confidence:'confianza', unusual:'inusual' }),
+  topic('batches','Messages API vs Message Batches','Claude API',25,'Messages API es sincrónica; Message Batches procesa gran volumen asíncrono.', ['Messages para interacción inmediata.','Batches para volumen y procesamiento diferido.','Elegir según latencia requerida.'], ['Usar Messages para 50.000 documentos nocturnos.','Usar Batches cuando el usuario espera respuesta inmediata.'], 'Procesar documentos durante la noche usa Batches.', { synchronous:'sincrónico', overnight:'durante la noche', immediate:'inmediato' }),
+  topic('specialized-review','Specialized Review Passes','Claude API',100,'Separar seguridad, lógica y diseño mejora detección y reduce competencia entre criterios.', ['Una preocupación por pasada.','Prompts y ejemplos especializados.','Síntesis posterior.'], ['Un prompt enorme con todos los criterios mezclados.'], 'Tres revisores especializados entregan hallazgos a una síntesis final.', { concern:'preocupación', specialized:'especializado', recall:'detección/cobertura' }),
+  topic('structured','Structured Output Method','Claude API',0,'Cuando el esquema es obligatorio, tool use con JSON Schema es más confiable que pedir JSON en texto.', ['Definir JSON Schema.','Usar tool_choice cuando la llamada debe ocurrir.','Validar downstream.'], ['Confiar solo en “respond in JSON”.','Regex sobre prosa libre para datos críticos.'], 'El sistema fuerza una herramienta cuyo input cumple el esquema.', { unless:'a menos que', strictly:'estrictamente', reliable:'confiable' }),
+  topic('schema','Optional, Nullable and Enum Schemas','Claude API',33,'El esquema debe representar ausencia y ambigüedad sin inventar.', ['Optional cuando el campo puede faltar.','Nullable cuando null es un valor válido.','Enum para valores controlados, incluyendo unknown si corresponde.'], ['Valores por defecto inventados.','Todo como string libre.'], 'middle_name es optional y status usa un enum con unknown.', { omit:'omitir', nullable:'admite null', constrained:'restringido' }),
+  topic('tool-schema','Tool Use with JSON Schema','Claude API',50,'El esquema define inputs válidos y tool_choice controla si la herramienta debe invocarse.', ['Descripción clara.','Campos requeridos y tipos correctos.','Forzar solo cuando sea necesario.'], ['Esquema ambiguo.','Forzar una herramienta incorrecta.'], 'Una extracción crítica usa tool_choice para garantizar salida estructurada.', { required:'requerido', invoke:'invocar', enforce:'forzar' }),
+  topic('truncation','Structured Output Truncation','Claude API',0,'Cuando una salida grande se corta, divide el trabajo y combina estructuras.', ['Lotes pequeños.','Resultados parciales válidos.','Fusión determinista.'], ['Aumentar max_tokens indefinidamente.','Eliminar el esquema.'], 'Se revisa cada conjunto de 20 archivos y luego se fusionan hallazgos.', { truncate:'truncar/cortar', split:'dividir', merge:'fusionar' }),
+  topic('extraction','Extraction Accuracy','Claude API',0,'La extracción consistente combina esquema, normalización, campos opcionales y few-shot examples.', ['Ejemplos representativos.','Instrucciones de normalización.','Representar datos ausentes.'], ['Prompt vago con alta temperatura.','Un único string para todo.'], 'Fechas se normalizan a ISO y campos ausentes permanecen null.', { varied:'variado', normalize:'normalizar', consistency:'consistencia' }),
+  topic('false-positives','Reducing False Positives','Claude API',100,'Las convenciones y exclusiones del proyecto reducen falsos positivos.', ['Patrones aceptados.','Reglas persistentes.','Criterios de exclusión.'], ['Reglas genéricas sin contexto.'], 'El revisor sabe que una excepción concreta está aceptada por arquitectura.', { false positive:'falso positivo', accepted:'aceptado', exclusion:'exclusión' }),
+  topic('boundaries','Inclusion and Exclusion Boundaries','Claude API',50,'Definir explícitamente qué incluir y excluir reduce ruido.', ['Categorías permitidas.','Categorías prohibidas.','Ejemplos de borde.'], ['“Find anything interesting”.','Pedir más hallazgos sin límites.'], 'La extracción incluye obligaciones contractuales y excluye texto promocional.', { include:'incluir', exclude:'excluir', boundary:'límite' }),
+
+  topic('builtin-tools','Grep vs Glob vs Read vs Bash','MCP and Tool Use',0,'Elige la herramienta según la operación.', ['Glob: nombres y rutas.','Grep: contenido.','Read: abrir archivo.','Bash: comandos cuando no existe herramienta incorporada adecuada.'], ['Usar Bash para todo.','Confundir Glob con búsqueda de texto.'], 'Para localizar *.yaml se usa Glob; para buscar timeout dentro, Grep.', { locate:'ubicar', occurrence:'aparición', built-in:'incorporado' }),
+  topic('tool-distribution','Tool Distribution Across Agents','MCP and Tool Use',50,'Cada agente debe recibir solo las herramientas necesarias.', ['Reduce complejidad de decisión.','Evita acciones fuera de rol.','Mejora seguridad.'], ['Todos los agentes con todas las herramientas.'], 'Un agente de síntesis no necesita herramientas de escritura.', { required:'necesario', prevent:'evitar', out-of-role:'fuera del rol' }),
+  topic('mcp-resources','MCP Resources vs Tools','MCP and Tool Use',100,'Resources exponen contenido; tools realizan acciones o consultas.', ['Manual de referencia como resource.','Operación mutante como tool.','Resources reducen exploración innecesaria.'], ['Exponer lectura pasiva como herramienta destructiva.'], 'Un catálogo estático se publica como MCP resource.', { resource:'recurso de lectura', action:'acción', expose:'exponer' }),
+  topic('mcp-integration','MCP Integration and Scope','MCP and Tool Use',50,'La integración requiere scope correcto, autenticación y verificación de discovery.', ['Seleccionar alcance.','Credenciales por variables de entorno.','Verificar herramientas descubiertas.'], ['Hardcodear secretos.','Asumir que el servidor quedó visible.'], 'Tras configurar auth, el cliente confirma que las tools aparecen.', { scope:'alcance', discovery:'descubrimiento', credential:'credencial' }),
+  topic('mcp-descriptions','MCP Tool Descriptions','MCP and Tool Use',100,'Las descripciones deben diferenciar propósito, inputs y límites.', ['Cuándo usarla.','Formato de entrada.','Cómo se distingue de herramientas similares.'], ['Nombre vago.','Texto de marketing sin instrucciones.'], 'search_users aclara filtros, límites y diferencia con get_user.', { distinguish:'distinguir', input:'entrada', boundary:'límite' }),
+  topic('tool-choice','tool_choice and Sequencing','MCP and Tool Use',100,'tool_choice garantiza invocación cuando es obligatoria; las dependencias definen secuencia.', ['Forzar una herramienta requerida.','No forzar cuando el modelo debe elegir.','Secuenciar si una llamada produce el input de otra.'], ['Llamar en paralelo herramientas dependientes.'], 'Primero se obtiene account_id y luego se consultan transacciones.', { obtain:'obtener', retrieve:'recuperar', sequence:'secuencia' }),
 ]
 
 export const questions: Question[] = [
-  {
-    id: 'q1', topicId: 'subagent-prompts',
-    prompt: 'A coordinator has already extracted findings from several reports. Which prompt BEST enables a subagent to finish without returning for missing context?',
-    options: ['Provide only the task title.', 'Provide findings, structured data, source metadata, constraints, and the required output.', 'Provide the raw reports but omit prior findings.', 'Ask the subagent to request anything it needs.'],
-    answer: 1,
-    explanationEs: 'La opción B entrega un prompt autocontenido y evita trabajo repetido o nuevas consultas al coordinador.',
-    vocabulary: { best: 'mejor', findings: 'hallazgos', omit: 'omitir' },
-  },
-  {
-    id: 'q2', topicId: 'parallel',
-    prompt: 'Five independent lookups are required before a final summary. Which execution plan minimizes latency?',
-    options: ['Run every lookup sequentially.', 'Run the lookups in parallel, then summarize.', 'Summarize before the lookups.', 'Increase max_tokens.'],
-    answer: 1,
-    explanationEs: 'Las búsquedas son independientes y pueden ejecutarse en paralelo; la síntesis depende de todas.',
-    vocabulary: { lookups: 'consultas', before: 'antes de', minimizes: 'minimiza' },
-  },
-  {
-    id: 'q3', topicId: 'delegation',
-    prompt: 'A research subagent must adapt as new evidence appears while the coordinator retains visibility. Which style is MOST appropriate?',
-    options: ['A rigid procedure with no deviation.', 'A goal-oriented instruction with success criteria and checkpoints.', 'No instructions beyond the topic.', 'A fixed file list that cannot change.'],
-    answer: 1,
-    explanationEs: 'La orientación a objetivos permite adaptación y los checkpoints mantienen control del coordinador.',
-    vocabulary: { while: 'mientras', retains: 'mantiene', checkpoints: 'puntos de control' },
-  },
-  {
-    id: 'q4', topicId: 'state',
-    prompt: 'A long-running multi-agent workflow may be interrupted. What should be persisted for reliable resumption?',
-    options: ['Only the original request.', 'Completed task IDs, outputs, checkpoints, pending work, and source references.', 'Only the final summary.', 'Only model settings.'],
-    answer: 1,
-    explanationEs: 'Para reanudar se necesita saber qué terminó, qué falta y qué evidencia ya existe.',
-    vocabulary: { pending: 'pendiente', reliable: 'confiable', resumption: 'reanudación' },
-  },
-  {
-    id: 'q5', topicId: 'structured',
-    prompt: 'A downstream system fails unless every response strictly matches a JSON schema. Which method is MOST reliable?',
-    options: ['Request JSON only in natural language.', 'Use tool use with a JSON schema and force the tool when needed.', 'Parse free-form prose with regular expressions.', 'Prefill an opening brace.'],
-    answer: 1,
-    explanationEs: 'Tool use con JSON Schema ofrece mayor cumplimiento estructural; tool_choice puede forzar la invocación.',
-    vocabulary: { unless: 'a menos que', strictly: 'estrictamente', reliable: 'confiable' },
-  },
-  {
-    id: 'q6', topicId: 'batches',
-    prompt: 'A company must process 50,000 documents overnight and does not need immediate responses. Which API mode is MOST appropriate?',
-    options: ['Synchronous Messages API.', 'Asynchronous Message Batches API.', 'One extremely large prompt.', 'Interactive Claude Code sessions.'],
-    answer: 1,
-    explanationEs: 'Message Batches es adecuado para alto volumen asíncrono cuando la respuesta inmediata no es necesaria.',
-    vocabulary: { overnight: 'durante la noche', immediate: 'inmediato', appropriate: 'adecuado' },
-  },
-  {
-    id: 'q7', topicId: 'schema',
-    prompt: 'A document may omit a middle name or contain an ambiguous status. How should the schema represent this?',
-    options: ['Require every field and invent defaults.', 'Use optional or nullable fields and a constrained enum with an unknown state when appropriate.', 'Store everything as unrestricted strings.', 'Reject the document.'],
-    answer: 1,
-    explanationEs: 'Optional, nullable y enums apropiados permiten representar ausencia o ambigüedad sin inventar datos.',
-    vocabulary: { omit: 'omitir', ambiguous: 'ambiguo', constrained: 'restringido' },
-  },
-  {
-    id: 'q8', topicId: 'tools',
-    prompt: 'Which built-in tool should be used FIRST to locate all YAML files under a repository?',
-    options: ['Grep', 'Glob', 'Read', 'Bash'],
-    answer: 1,
-    explanationEs: 'Glob localiza archivos por patrón de nombre o ruta.',
-    vocabulary: { first: 'primero', locate: 'ubicar', under: 'dentro de' },
-  },
-  {
-    id: 'q9', topicId: 'mcp',
-    prompt: 'A server exposes a large reference manual that agents only need to read. How should it usually be exposed?',
-    options: ['As an MCP resource.', 'As a destructive MCP tool.', 'As a shell command.', 'As a forced tool call.'],
-    answer: 0,
-    explanationEs: 'El contenido para lectura corresponde a un resource; las acciones corresponden a tools.',
-    vocabulary: { exposes: 'expone', usually: 'normalmente', reference: 'referencia' },
-  },
-  {
-    id: 'q10', topicId: 'context',
-    prompt: 'A conversation is exceeding practical context limits. Which strategy is MOST appropriate?',
-    options: ['Keep every token forever.', 'Use summaries, structured state, selective retention, and sliding windows.', 'Increase temperature.', 'Repeat the full conversation each turn.'],
-    answer: 1,
-    explanationEs: 'La optimización conserva el estado útil y elimina detalles no necesarios.',
-    vocabulary: { exceeding: 'superando', retention: 'retención', sliding: 'deslizante' },
-  },
+  { id:'q1', topicId:'subagent-prompts', prompt:'A coordinator has already extracted findings from several reports. Which prompt BEST enables a subagent to finish without returning for missing context?', options:['Provide only the task title.','Provide findings, structured data, source metadata, constraints, and the required output.','Provide the raw reports but omit prior findings.','Ask the subagent to request anything it needs.'], answer:1, explanationEs:'La opción B entrega un prompt autocontenido y evita trabajo repetido o nuevas consultas al coordinador.', vocabulary:{ best:'mejor', findings:'hallazgos', omit:'omitir' } },
+  { id:'q2', topicId:'parallel', prompt:'Five independent lookups are required before a final summary. Which execution plan minimizes latency?', options:['Run every lookup sequentially.','Run the lookups in parallel, then summarize.','Summarize before the lookups.','Increase max_tokens.'], answer:1, explanationEs:'Las búsquedas son independientes y pueden ejecutarse en paralelo; la síntesis depende de todas.', vocabulary:{ lookups:'consultas', before:'antes de', minimizes:'minimiza' } },
+  { id:'q3', topicId:'delegation', prompt:'A research subagent must adapt as new evidence appears while the coordinator retains visibility. Which style is MOST appropriate?', options:['A rigid procedure with no deviation.','A goal-oriented instruction with success criteria and checkpoints.','No instructions beyond the topic.','A fixed file list that cannot change.'], answer:1, explanationEs:'La orientación a objetivos permite adaptación y los checkpoints mantienen control del coordinador.', vocabulary:{ while:'mientras', retains:'mantiene', checkpoints:'puntos de control' } },
+  { id:'q4', topicId:'state', prompt:'A long-running multi-agent workflow may be interrupted. What should be persisted for reliable resumption?', options:['Only the original request.','Completed task IDs, outputs, checkpoints, pending work, and source references.','Only the final summary.','Only model settings.'], answer:1, explanationEs:'Para reanudar se necesita saber qué terminó, qué falta y qué evidencia ya existe.', vocabulary:{ pending:'pendiente', reliable:'confiable', resumption:'reanudación' } },
+  { id:'q5', topicId:'structured', prompt:'A downstream system fails unless every response strictly matches a JSON schema. Which method is MOST reliable?', options:['Request JSON only in natural language.','Use tool use with a JSON schema and force the tool when needed.','Parse free-form prose with regular expressions.','Prefill an opening brace.'], answer:1, explanationEs:'Tool use con JSON Schema ofrece mayor cumplimiento estructural; tool_choice puede forzar la invocación.', vocabulary:{ unless:'a menos que', strictly:'estrictamente', reliable:'confiable' } },
+  { id:'q6', topicId:'batches', prompt:'A company must process 50,000 documents overnight and does not need immediate responses. Which API mode is MOST appropriate?', options:['Synchronous Messages API.','Asynchronous Message Batches API.','One extremely large prompt.','Interactive Claude Code sessions.'], answer:1, explanationEs:'Message Batches es adecuado para alto volumen asíncrono cuando la respuesta inmediata no es necesaria.', vocabulary:{ overnight:'durante la noche', immediate:'inmediato', appropriate:'adecuado' } },
+  { id:'q7', topicId:'schema', prompt:'A document may omit a middle name or contain an ambiguous status. How should the schema represent this?', options:['Require every field and invent defaults.','Use optional or nullable fields and a constrained enum with an unknown state when appropriate.','Store everything as unrestricted strings.','Reject the document.'], answer:1, explanationEs:'Optional, nullable y enums apropiados permiten representar ausencia o ambigüedad sin inventar datos.', vocabulary:{ omit:'omitir', ambiguous:'ambiguo', constrained:'restringido' } },
+  { id:'q8', topicId:'builtin-tools', prompt:'Which built-in tool should be used FIRST to locate all YAML files under a repository?', options:['Grep','Glob','Read','Bash'], answer:1, explanationEs:'Glob localiza archivos por patrón de nombre o ruta.', vocabulary:{ first:'primero', locate:'ubicar', under:'dentro de' } },
+  { id:'q9', topicId:'mcp-resources', prompt:'A server exposes a large reference manual that agents only need to read. How should it usually be exposed?', options:['As an MCP resource.','As a destructive MCP tool.','As a shell command.','As a forced tool call.'], answer:0, explanationEs:'El contenido para lectura corresponde a un resource; las acciones corresponden a tools.', vocabulary:{ exposes:'expone', usually:'normalmente', reference:'referencia' } },
+  { id:'q10', topicId:'context-optimization', prompt:'A conversation is exceeding practical context limits. Which strategy is MOST appropriate?', options:['Keep every token forever.','Use summaries, structured state, selective retention, and sliding windows.','Increase temperature.','Repeat the full conversation each turn.'], answer:1, explanationEs:'La optimización conserva el estado útil y elimina detalles no necesarios.', vocabulary:{ exceeding:'superando', retention:'retención', sliding:'deslizante' } },
+  { id:'q11', topicId:'human-review', prompt:'Which routing strategy BEST targets human review effort?', options:['Randomly sample 10% of outputs.','Route low-confidence, ambiguous, or unusual cases to reviewers.','Review only short documents.','Review every output regardless of risk.'], answer:1, explanationEs:'La revisión humana debe concentrarse en los casos de mayor riesgo o incertidumbre.', vocabulary:{ route:'enrutar', ambiguous:'ambiguo', regardless:'sin importar' } },
+  { id:'q12', topicId:'truncation', prompt:'A large structured review repeatedly truncates before completing valid JSON. What is the BEST remediation?', options:['Increase max_tokens indefinitely.','Split the review into smaller calls and merge the structures.','Remove the schema.','Switch to free-form prose.'], answer:1, explanationEs:'Dividir el trabajo produce resultados parciales válidos que luego pueden fusionarse.', vocabulary:{ truncates:'se corta', split:'dividir', merge:'fusionar' } },
+  { id:'q13', topicId:'cicd', prompt:'Which Claude Code CI/CD setup BEST reduces runaway automation risk?', options:['Interactive mode with unrestricted permissions.','Non-interactive execution with cost, turn, and permission limits.','Unlimited retries.','A larger context window only.'], answer:1, explanationEs:'En CI se deben limitar costo, turnos y permisos, además de usar modo no interactivo.', vocabulary:{ runaway:'fuera de control', unrestricted:'sin restricciones', limit:'límite' } },
+  { id:'q14', topicId:'test-generation', prompt:'What context MOST improves generated test quality?', options:['Only the source file.','Existing tests, fixture conventions, expected behaviors, and criteria against trivial assertions.','A request to maximize test count.','Higher temperature.'], answer:1, explanationEs:'Los tests existentes y criterios conductuales ayudan a generar pruebas útiles y consistentes.', vocabulary:{ fixture:'preparación de prueba', trivial:'trivial', behavior:'comportamiento' } },
+  { id:'q15', topicId:'mcp-integration', prompt:'Which sequence BEST validates an MCP integration?', options:['Choose scope, configure authentication, then verify tool discovery.','Hard-code credentials and assume success.','Install globally in every case.','Expose all content as executable tools.'], answer:0, explanationEs:'Scope, autenticación y discovery son los pasos esenciales.', vocabulary:{ scope:'alcance', verify:'verificar', discovery:'descubrimiento' } },
 ]
