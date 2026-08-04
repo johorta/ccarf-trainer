@@ -1,5 +1,6 @@
 import type { Question } from './data'
 import { extraExamQuestions } from './extraExamQuestions'
+import { finalExamQuestions } from './finalExamQuestions'
 
 export type ExamConfig = {
   id: string
@@ -11,14 +12,14 @@ export type ExamConfig = {
 }
 
 export const examConfigs: ExamConfig[] = [
-  { id: 'foundation', title: 'Mock Exam 1 — Foundation', description: 'Repaso completo con énfasis en conceptos fundamentales.', questionCount: 15, durationMinutes: 30, difficulty: 'Foundation' },
-  { id: 'intermediate', title: 'Mock Exam 2 — Intermediate', description: 'Escenarios mixtos con distractores más cercanos al examen.', questionCount: 15, durationMinutes: 28, difficulty: 'Intermediate' },
-  { id: 'advanced', title: 'Mock Exam 3 — Advanced', description: 'Preguntas de aplicación, arquitectura y selección de la mejor alternativa.', questionCount: 15, durationMinutes: 25, difficulty: 'Advanced' },
-  { id: 'final', title: 'Mock Exam 4 — Final Readiness', description: 'Simulador final con todos los dominios y prioridad en temas débiles.', questionCount: 15, durationMinutes: 22, difficulty: 'Final' },
+  { id: 'foundation', title: 'Mock Exam 1 — Foundation', description: 'Repaso completo con énfasis en conceptos fundamentales.', questionCount: 60, durationMinutes: 90, difficulty: 'Foundation' },
+  { id: 'intermediate', title: 'Mock Exam 2 — Intermediate', description: 'Escenarios mixtos con distractores más cercanos al examen.', questionCount: 60, durationMinutes: 90, difficulty: 'Intermediate' },
+  { id: 'advanced', title: 'Mock Exam 3 — Advanced', description: 'Preguntas de aplicación, arquitectura y selección de la mejor alternativa.', questionCount: 60, durationMinutes: 90, difficulty: 'Advanced' },
+  { id: 'final', title: 'Mock Exam 4 — Final Readiness', description: 'Simulador final con todos los dominios y prioridad en temas débiles.', questionCount: 60, durationMinutes: 90, difficulty: 'Final' },
 ]
 
 export function buildExam(config: ExamConfig, questions: Question[]): Question[] {
-  const questionBank = [...questions, ...extraExamQuestions]
+  const questionBank = [...questions, ...extraExamQuestions, ...finalExamQuestions]
   const byTopic = new Map<string, Question[]>()
   questionBank.forEach((question) => {
     const list = byTopic.get(question.topicId) ?? []
