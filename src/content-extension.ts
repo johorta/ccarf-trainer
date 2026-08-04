@@ -7,6 +7,7 @@ import { claudeCodeLessonsPart2 } from './lessons-claude-code-part2'
 import { claudeCodeLessonsPart3 } from './lessons-claude-code-part3'
 import { claudeApiLessonsPart1 } from './lessons-claude-api-part1'
 import { claudeApiLessonsPart2 } from './lessons-claude-api-part2'
+import { mcpLessonsPart1 } from './lessons-mcp-part1'
 import { agenticQuestionsPart2 } from './questions-agentic-part2'
 import { agenticQuestionsPart3 } from './questions-agentic-part3'
 import { claudeCodeQuestionsPart1 } from './questions-claude-code-part1'
@@ -14,6 +15,7 @@ import { claudeCodeQuestionsPart2 } from './questions-claude-code-part2'
 import { claudeCodeQuestionsPart3 } from './questions-claude-code-part3'
 import { claudeApiQuestionsPart1 } from './questions-claude-api-part1'
 import { claudeApiQuestionsPart2 } from './questions-claude-api-part2'
+import { mcpQuestionsPart1 } from './questions-mcp-part1'
 
 Object.assign(
   lessons,
@@ -24,6 +26,7 @@ Object.assign(
   claudeCodeLessonsPart3,
   claudeApiLessonsPart1,
   claudeApiLessonsPart2,
+  mcpLessonsPart1,
 )
 
 questions.push(
@@ -34,6 +37,7 @@ questions.push(
   ...claudeCodeQuestionsPart3,
   ...claudeApiQuestionsPart1,
   ...claudeApiQuestionsPart2,
+  ...mcpQuestionsPart1,
 )
 
 const loadedMemoryQuestion = questions.find((question) => question.id === 'q95')
