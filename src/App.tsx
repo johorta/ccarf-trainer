@@ -1,21 +1,49 @@
 import { useMemo, useState } from 'react'
 import { questions, topics, type Question, type Topic } from './data'
+import { lessons, type LessonContent } from './lessons'
 
 type Progress = {
   answered: number
   correct: number
   byTopic: Record<string, { answered: number; correct: number }>
+  completedLessons?: string[]
+  lastTopicId?: string
 }
 
-type View = 'dashboard' | 'study' | 'practice' | 'vocabulary'
+type View = 'dashboard' | 'course' | 'practice' | 'progress'
 
 const STORAGE_KEY = 'ccarf-trainer-progress-v1'
 
+function emptyProgress(): Progress {
+  return { answered: 0, correct: 0, byTopic: {}, completedLessons: [] }
+}
+
 function loadProgress(): Progress {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Progress
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Progress
+    return { ...emptyProgress(), ...stored, completedLessons: stored.completedLessons ?? [] }
   } catch {
-    return { answered: 0, correct: 0, byTopic: {} }
+    return emptyProgress()
+  }
+}
+
+function genericLesson(topic: Topic): LessonContent {
+  return {
+    topicId: topic.id,
+    readingMinutes: 8,
+    difficulty: topic.priority === 'high' ? 4 : topic.priority === 'medium' ? 3 : 2,
+    objectives: topic.keyPoints,
+    sections: [
+      {
+        title: 'Concepto central',
+        paragraphs: [topic.lesson, 'Esta lección está incorporada al mapa completo del curso. Su contenido profundo se irá ampliando manteniendo el mismo formato de lectura, ejemplos, trampas y práctica vinculada.'],
+      },
+      { title: 'Puntos que debes dominar', bullets: topic.keyPoints },
+      { title: 'Trampas frecuentes del examen', bullets: topic.traps },
+      { title: 'Escenario práctico', paragraphs: [topic.example] },
+    ],
+    checklist: topic.keyPoints.map((point) => `¿Puedes explicar por qué: ${point}`),
+    summary: [topic.lesson, ...topic.keyPoints],
   }
 }
 
@@ -30,6 +58,7 @@ function App() {
 
   const accuracy = progress.answered ? Math.round((progress.correct / progress.answered) * 100) : 0
   const domains = ['Todos', ...Array.from(new Set(topics.map((topic) => topic.domain)))]
+  const completedLessons = progress.completedLessons ?? []
 
   const weightedQuestions = useMemo(() => {
     return [...questions].sort((a, b) => {
@@ -45,12 +74,18 @@ function App() {
     })
   }, [progress])
 
-  const vocabulary = useMemo(() => {
-    const entries = new Map<string, string>()
-    topics.forEach((topic) => Object.entries(topic.vocabulary).forEach(([word, meaning]) => entries.set(word, meaning)))
-    questions.forEach((question) => Object.entries(question.vocabulary).forEach(([word, meaning]) => entries.set(word, meaning)))
-    return [...entries.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [])
+  function persist(next: Progress) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    setProgress(next)
+  }
+
+  function openTopic(topic: Topic) {
+    setSelectedTopic(topic)
+    const next = { ...progress, lastTopicId: topic.id }
+    persist(next)
+    setView('course')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function startPractice(topicId?: string) {
     const pool = topicId ? weightedQuestions.filter((question) => question.topicId === topicId) : weightedQuestions
@@ -58,12 +93,14 @@ function App() {
     setSelected(null)
     setChecked(false)
     setView('practice')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function submit() {
     if (!current || selected === null || checked) return
     const isCorrect = selected === current.answer
     const next: Progress = {
+      ...progress,
       answered: progress.answered + 1,
       correct: progress.correct + (isCorrect ? 1 : 0),
       byTopic: {
@@ -74,8 +111,7 @@ function App() {
         },
       },
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    setProgress(next)
+    persist(next)
     setChecked(true)
   }
 
@@ -85,6 +121,14 @@ function App() {
     setCurrent(weightedQuestions[(index + 1) % weightedQuestions.length])
     setSelected(null)
     setChecked(false)
+  }
+
+  function toggleLessonComplete(topicId: string) {
+    const currentCompleted = progress.completedLessons ?? []
+    const completed = currentCompleted.includes(topicId)
+      ? currentCompleted.filter((id) => id !== topicId)
+      : [...currentCompleted, topicId]
+    persist({ ...progress, completedLessons: completed })
   }
 
   function exportProgress() {
@@ -103,6 +147,8 @@ function App() {
   }
 
   const filteredTopics = domainFilter === 'Todos' ? topics : topics.filter((topic) => topic.domain === domainFilter)
+  const lastTopic = topics.find((topic) => topic.id === progress.lastTopicId) ?? topics.find((topic) => topic.priority === 'high') ?? topics[0]
+  const coursePercent = Math.round((completedLessons.length / topics.length) * 100)
 
   return (
     <main className="shell">
@@ -110,9 +156,9 @@ function App() {
         <button className="brand" onClick={() => setView('dashboard')}>CCAR-F Trainer</button>
         <div>
           <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Inicio</button>
-          <button className={view === 'study' ? 'active' : ''} onClick={() => setView('study')}>Estudiar</button>
-          <button className={view === 'practice' ? 'active' : ''} onClick={() => startPractice()}>Practicar</button>
-          <button className={view === 'vocabulary' ? 'active' : ''} onClick={() => setView('vocabulary')}>Vocabulario</button>
+          <button className={view === 'course' ? 'active' : ''} onClick={() => { setSelectedTopic(null); setView('course') }}>Curso</button>
+          <button className={view === 'practice' ? 'active' : ''} onClick={() => startPractice()}>Práctica</button>
+          <button className={view === 'progress' ? 'active' : ''} onClick={() => setView('progress')}>Progreso</button>
         </div>
       </nav>
 
@@ -120,44 +166,48 @@ function App() {
         <>
           <header className="hero">
             <div>
-              <span className="eyebrow">CCAR-F TRAINER</span>
-              <h1>Estudia todos los objetivos, priorizando tus brechas.</h1>
-              <p>Clases en español, preguntas en inglés y progreso guardado en este dispositivo.</p>
+              <span className="eyebrow">CURSO INTERACTIVO CCAR-F</span>
+              <h1>Aprende los conceptos antes de practicar.</h1>
+              <p>Lecciones extensas en español, preguntas tipo examen en inglés y refuerzo adaptativo de tus áreas débiles.</p>
             </div>
             <div className="hero-actions">
-              <button className="primary" onClick={() => setView('study')}>Ver temas de estudio</button>
+              <button className="primary" onClick={() => openTopic(lastTopic)}>Continuar curso</button>
               <button className="primary" onClick={() => startPractice()}>Práctica adaptativa</button>
             </div>
           </header>
 
           <section className="stats">
-            <article><strong>{progress.answered}</strong><span>Respondidas</span></article>
+            <article><strong>{coursePercent}%</strong><span>Curso completado</span></article>
+            <article><strong>{progress.answered}</strong><span>Preguntas respondidas</span></article>
             <article><strong>{accuracy}%</strong><span>Precisión</span></article>
-            <article><strong>{topics.filter((topic) => topic.priority === 'high').length}</strong><span>Temas prioritarios</span></article>
           </section>
 
           <section className="dashboard-grid">
-            <article className="panel">
-              <span className="eyebrow">SIGUIENTE PASO</span>
-              <h2>{weightedQuestions[0] ? topics.find((topic) => topic.id === weightedQuestions[0].topicId)?.name : 'Comenzar'}</h2>
-              <p>La práctica adaptativa prioriza los objetivos con menor puntaje y los temas que falles dentro de la aplicación.</p>
-              <button className="primary" onClick={() => startPractice()}>Comenzar ahora</button>
+            <article className="panel featured-panel">
+              <span className="eyebrow">CONTINUAR APRENDIENDO</span>
+              <h2>{lastTopic.name}</h2>
+              <p>{lastTopic.lesson}</p>
+              <button className="primary" onClick={() => openTopic(lastTopic)}>Abrir lección</button>
             </article>
             <article className="panel">
-              <span className="eyebrow">MAPA COMPLETO</span>
-              <h2>{topics.length} objetivos</h2>
-              <p>Agentic Architecture, Claude Code, Claude API, MCP y Tool Use.</p>
-              <button className="secondary" onClick={() => setView('study')}>Abrir clases</button>
+              <span className="eyebrow">ESTRATEGIA DE RECUPERACIÓN</span>
+              <h2>{topics.filter((topic) => topic.priority === 'high').length} temas prioritarios</h2>
+              <p>El curso incluye todos los objetivos, pero privilegia los resultados más bajos de tu score report.</p>
+              <button className="secondary" onClick={() => { setSelectedTopic(null); setView('course') }}>Ver mapa completo</button>
             </article>
           </section>
         </>
       )}
 
-      {view === 'study' && !selectedTopic && (
+      {view === 'course' && !selectedTopic && (
         <section>
           <div className="section-title">
-            <div><span className="eyebrow">CURSO COMPLETO</span><h1>Temas de estudio</h1><p>Explicaciones en español basadas en los objetivos de tu score report.</p></div>
+            <div><span className="eyebrow">CURSO COMPLETO</span><h1>Dominios y lecciones</h1><p>Abre una lección para estudiar teoría, ejemplos, trampas y checklist de examen.</p></div>
             <button className="secondary" onClick={exportProgress}>Exportar progreso</button>
+          </div>
+          <div className="course-overview">
+            <div><strong>{completedLessons.length}/{topics.length}</strong><span>lecciones completadas</span></div>
+            <div className="progress large-progress"><div style={{ width: `${coursePercent}%` }} /></div>
           </div>
           <div className="filter-row">
             {domains.map((domain) => <button key={domain} className={domainFilter === domain ? 'filter active' : 'filter'} onClick={() => setDomainFilter(domain)}>{domain}</button>)}
@@ -165,14 +215,17 @@ function App() {
           <div className="topic-grid">
             {filteredTopics.map((topic) => {
               const score = scoreFor(topic)
+              const complete = completedLessons.includes(topic.id)
+              const lesson = lessons[topic.id]
               return (
-                <article className="topic-card clickable" key={topic.id} onClick={() => setSelectedTopic(topic)}>
+                <article className={`topic-card clickable ${complete ? 'completed' : ''}`} key={topic.id} onClick={() => openTopic(topic)}>
                   <div className="topic-meta"><div className={`priority ${topic.priority}`}>{topic.priority === 'high' ? 'Alta prioridad' : topic.priority === 'medium' ? 'Prioridad media' : 'Refuerzo'}</div><span>{topic.domain}</span></div>
-                  <h3>{topic.name}</h3>
+                  <h3>{complete ? '✓ ' : ''}{topic.name}</h3>
                   <p>{topic.lesson}</p>
+                  <div className="lesson-card-meta"><span>{lesson ? `${lesson.readingMinutes} min` : '8 min'}</span><span>Dificultad {lesson ? lesson.difficulty : topic.priority === 'high' ? 4 : 2}/5</span></div>
                   <div className="score-row"><span>Dominio estimado</span><strong>{score}%</strong></div>
                   <div className="progress"><div style={{ width: `${score}%` }} /></div>
-                  <div className="open-label">Abrir clase →</div>
+                  <div className="open-label">{complete ? 'Repasar lección →' : 'Comenzar lección →'}</div>
                 </article>
               )
             })}
@@ -180,22 +233,66 @@ function App() {
         </section>
       )}
 
-      {view === 'study' && selectedTopic && (
-        <section className="lesson-page">
-          <button className="back" onClick={() => setSelectedTopic(null)}>← Volver a todos los temas</button>
-          <div className="lesson-header">
-            <div><span className="eyebrow">{selectedTopic.domain}</span><h1>{selectedTopic.name}</h1><p>{selectedTopic.lesson}</p></div>
-            <div className={`priority ${selectedTopic.priority}`}>{selectedTopic.priority === 'high' ? 'Alta prioridad' : selectedTopic.priority === 'medium' ? 'Prioridad media' : 'Refuerzo'}</div>
-          </div>
-          <div className="lesson-layout">
-            <article className="lesson-block"><h2>Qué debes aprender</h2><ul>{selectedTopic.keyPoints.map((point) => <li key={point}>{point}</li>)}</ul></article>
-            <article className="lesson-block warning"><h2>Trampas del examen</h2><ul>{selectedTopic.traps.map((trap) => <li key={trap}>{trap}</li>)}</ul></article>
-            <article className="lesson-block full"><h2>Ejemplo práctico</h2><p>{selectedTopic.example}</p></article>
-            <article className="lesson-block full"><h2>Vocabulario clave</h2><div className="vocabulary large">{Object.entries(selectedTopic.vocabulary).map(([word, meaning]) => <span key={word}><b>{word}</b>: {meaning}</span>)}</div></article>
-          </div>
-          <button className="primary" onClick={() => startPractice(selectedTopic.id)}>Practicar este tema</button>
-        </section>
-      )}
+      {view === 'course' && selectedTopic && (() => {
+        const lesson = lessons[selectedTopic.id] ?? genericLesson(selectedTopic)
+        const complete = completedLessons.includes(selectedTopic.id)
+        const currentIndex = topics.findIndex((topic) => topic.id === selectedTopic.id)
+        const previous = currentIndex > 0 ? topics[currentIndex - 1] : null
+        const next = currentIndex < topics.length - 1 ? topics[currentIndex + 1] : null
+        return (
+          <section className="lesson-page">
+            <button className="back" onClick={() => setSelectedTopic(null)}>← Volver al índice del curso</button>
+            <div className="lesson-header">
+              <div>
+                <span className="eyebrow">{selectedTopic.domain}</span>
+                <h1>{selectedTopic.name}</h1>
+                <p>{selectedTopic.lesson}</p>
+                <div className="lesson-meta"><span>{lesson.readingMinutes} min de lectura</span><span>Dificultad {'★'.repeat(lesson.difficulty)}{'☆'.repeat(5 - lesson.difficulty)}</span></div>
+              </div>
+              <div className={`priority ${selectedTopic.priority}`}>{selectedTopic.priority === 'high' ? 'Alta prioridad' : selectedTopic.priority === 'medium' ? 'Prioridad media' : 'Refuerzo'}</div>
+            </div>
+
+            <div className="lesson-content">
+              <aside className="lesson-sidebar">
+                <strong>En esta lección</strong>
+                {lesson.sections.map((section) => <a key={section.title} href={`#${section.title.replace(/[^a-zA-Z0-9]/g, '-')}`}>{section.title}</a>)}
+              </aside>
+              <article className="lesson-article">
+                <section className="learning-objectives">
+                  <h2>Qué aprenderás</h2>
+                  <ul>{lesson.objectives.map((objective) => <li key={objective}>{objective}</li>)}</ul>
+                </section>
+                {lesson.sections.map((section) => (
+                  <section className="content-section" id={section.title.replace(/[^a-zA-Z0-9]/g, '-')} key={section.title}>
+                    <h2>{section.title}</h2>
+                    {section.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                    {section.bullets && <ul>{section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
+                    {section.diagram && <div className="diagram">{section.diagram.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)}</div>}
+                    {section.goodExample && <div className="example good"><strong>Ejemplo recomendado</strong><pre>{section.goodExample}</pre></div>}
+                    {section.badExample && <div className="example bad"><strong>Ejemplo problemático</strong><pre>{section.badExample}</pre></div>}
+                  </section>
+                ))}
+                <section className="content-section checklist">
+                  <h2>Checklist antes del examen</h2>
+                  {lesson.checklist.map((item) => <label key={item}><input type="checkbox" /> {item}</label>)}
+                </section>
+                <section className="content-section summary-box">
+                  <h2>Resumen que debes recordar</h2>
+                  <ul>{lesson.summary.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
+                <div className="lesson-actions">
+                  <button className={complete ? 'secondary' : 'primary'} onClick={() => toggleLessonComplete(selectedTopic.id)}>{complete ? 'Marcar como pendiente' : '✓ Marcar como completada'}</button>
+                  <button className="primary" onClick={() => startPractice(selectedTopic.id)}>Practicar este tema</button>
+                </div>
+                <div className="lesson-navigation">
+                  {previous ? <button className="secondary" onClick={() => openTopic(previous)}>← {previous.name}</button> : <span />}
+                  {next ? <button className="secondary" onClick={() => openTopic(next)}>{next.name} →</button> : <span />}
+                </div>
+              </article>
+            </div>
+          </section>
+        )
+      })()}
 
       {view === 'practice' && current && (
         <section className="quiz-card">
@@ -212,17 +309,26 @@ function App() {
             <div className="feedback">
               <h3>{selected === current.answer ? 'Correcta' : 'Incorrecta'}</h3>
               <p>{current.explanationEs}</p>
-              <div className="vocabulary">{Object.entries(current.vocabulary).map(([word, meaning]) => <span key={word}><b>{word}</b>: {meaning}</span>)}</div>
-              <button className="primary" onClick={nextQuestion}>Siguiente pregunta</button>
+              <div className="feedback-actions">
+                <button className="secondary" onClick={() => { const topic = topics.find((item) => item.id === current.topicId); if (topic) openTopic(topic) }}>Repasar la lección</button>
+                <button className="primary" onClick={nextQuestion}>Siguiente pregunta</button>
+              </div>
             </div>
           )}
         </section>
       )}
 
-      {view === 'vocabulary' && (
+      {view === 'progress' && (
         <section>
-          <div className="section-title"><div><span className="eyebrow">ENGLISH HINTS</span><h1>Vocabulario del examen</h1><p>Palabras que pueden cambiar por completo el sentido de una pregunta.</p></div></div>
-          <div className="vocab-grid">{vocabulary.map(([word, meaning]) => <article key={word}><strong>{word}</strong><span>{meaning}</span></article>)}</div>
+          <div className="section-title"><div><span className="eyebrow">TU AVANCE</span><h1>Progreso del curso</h1><p>Lecciones completadas y desempeño de práctica por objetivo.</p></div><button className="secondary" onClick={exportProgress}>Exportar JSON</button></div>
+          <section className="stats">
+            <article><strong>{completedLessons.length}</strong><span>Lecciones completadas</span></article>
+            <article><strong>{progress.answered}</strong><span>Preguntas respondidas</span></article>
+            <article><strong>{accuracy}%</strong><span>Precisión total</span></article>
+          </section>
+          <div className="progress-list">
+            {topics.map((topic) => <article key={topic.id}><div><strong>{topic.name}</strong><span>{completedLessons.includes(topic.id) ? 'Lección completada' : 'Pendiente'}</span></div><strong>{scoreFor(topic)}%</strong></article>)}
+          </div>
         </section>
       )}
     </main>
