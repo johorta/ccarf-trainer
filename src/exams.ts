@@ -18,8 +18,21 @@ export const examConfigs: ExamConfig[] = [
   { id: 'final', title: 'Mock Exam 4 — Final Readiness', description: 'Simulador final con todos los dominios y prioridad en temas débiles.', questionCount: 60, durationMinutes: 90, difficulty: 'Final' },
 ]
 
+function uniqueQuestionsById(questionSources: Question[][]): Question[] {
+  const uniqueQuestions = new Map<string, Question>()
+
+  questionSources.flat().forEach((question) => {
+    if (!uniqueQuestions.has(question.id)) uniqueQuestions.set(question.id, question)
+  })
+
+  return [...uniqueQuestions.values()]
+}
+
 export function buildExam(config: ExamConfig, questions: Question[]): Question[] {
-  const questionBank = [...questions, ...extraExamQuestions, ...finalExamQuestions]
+  // Several question modules historically reused IDs such as q16–q60.
+  // Exam answers are stored by question ID, so duplicates prevented the
+  // answered-question count from ever reaching 60 and kept Finish disabled.
+  const questionBank = uniqueQuestionsById([questions, extraExamQuestions, finalExamQuestions])
   const byTopic = new Map<string, Question[]>()
   questionBank.forEach((question) => {
     const list = byTopic.get(question.topicId) ?? []
