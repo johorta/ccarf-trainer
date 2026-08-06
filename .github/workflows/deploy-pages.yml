@@ -14,7 +14,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Use a branch-specific lock so an old run using the former global "pages"
+  # group cannot leave new deployments waiting indefinitely.
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
