@@ -5,6 +5,7 @@ import './content-extension'
 import App from './App'
 import AppEnglish from './AppEnglish'
 import { StoredProgressTransfer } from './progress-transfer'
+import { StoredSimulatorHistory } from './SimulatorHistory'
 import './styles.css'
 import './course.css'
 import './exams.css'
@@ -28,6 +29,9 @@ function Root() {
       {englishRoute
         ? <StoredProgressTransfer locale="en" storageKey="ccarf-trainer-progress-en-v1" />
         : <StoredProgressTransfer locale="es" storageKey="ccarf-trainer-progress-v2" />}
+      {englishRoute
+        ? <StoredSimulatorHistory locale="en" storageKey="ccarf-trainer-progress-en-v1" />
+        : <StoredSimulatorHistory locale="es" storageKey="ccarf-trainer-progress-v2" />}
     </>
   )
 }
