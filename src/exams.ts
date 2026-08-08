@@ -1,4 +1,4 @@
-import type { Question } from './data'
+import { questions as sharedPracticeQuestions, type Question } from './data'
 import { expandedQuestionBank } from './expandedQuestionBank'
 import { extraExamQuestions } from './extraExamQuestions'
 import { finalExamQuestions } from './finalExamQuestions'
@@ -61,6 +61,10 @@ function buildQuestionBank(questionSources: Question[][]): Question[] {
   return [...uniqueByPrompt.values()]
 }
 
+function fullQuestionBank(questions: Question[]): Question[] {
+  return buildQuestionBank([questions, extraExamQuestions, finalExamQuestions, expandedQuestionBank])
+}
+
 function balancedRandomOrder(questions: Question[]): Question[] {
   const byTopic = new Map<string, Question[]>()
   questions.forEach((question) => {
@@ -84,7 +88,7 @@ function balancedRandomOrder(questions: Question[]): Question[] {
 }
 
 export function getExamQuestionPool(questions: Question[]): Question[] {
-  return buildQuestionBank([questions, extraExamQuestions, finalExamQuestions, expandedQuestionBank])
+  return fullQuestionBank(questions)
 }
 
 export function getExamQuestionPoolSize(questions: Question[]): number {
@@ -112,3 +116,9 @@ export function buildExam(
     .slice(0, Math.min(config.questionCount, ordered.length))
     .map(randomizeQuestionOptions)
 }
+
+// Practice mode imports the original `questions` array directly. Hydrate that
+// shared array once with the complete bank and randomize answer positions so
+// practice is not biased toward any fixed letter such as B.
+const randomizedPracticeBank = fullQuestionBank(sharedPracticeQuestions).map(randomizeQuestionOptions)
+sharedPracticeQuestions.splice(0, sharedPracticeQuestions.length, ...randomizedPracticeBank)
