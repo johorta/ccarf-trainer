@@ -1,4 +1,5 @@
 import type { Question } from './data'
+import { expandedQuestionBank } from './expandedQuestionBank'
 import { extraExamQuestions } from './extraExamQuestions'
 import { finalExamQuestions } from './finalExamQuestions'
 
@@ -34,6 +35,15 @@ function shuffle<T>(items: T[]): T[] {
     ;[copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]]
   }
   return copy
+}
+
+export function randomizeQuestionOptions(question: Question): Question {
+  const optionIndexes = shuffle(question.options.map((_, index) => index))
+  return {
+    ...question,
+    options: optionIndexes.map((index) => question.options[index]),
+    answer: optionIndexes.indexOf(question.answer),
+  }
 }
 
 function buildQuestionBank(questionSources: Question[][]): Question[] {
@@ -74,7 +84,7 @@ function balancedRandomOrder(questions: Question[]): Question[] {
 }
 
 export function getExamQuestionPool(questions: Question[]): Question[] {
-  return buildQuestionBank([questions, extraExamQuestions, finalExamQuestions])
+  return buildQuestionBank([questions, extraExamQuestions, finalExamQuestions, expandedQuestionBank])
 }
 
 export function getExamQuestionPoolSize(questions: Question[]): number {
@@ -98,5 +108,7 @@ export function buildExam(
     ...balancedRandomOrder(previouslySeenQuestions),
   ]
 
-  return ordered.slice(0, Math.min(config.questionCount, ordered.length))
+  return ordered
+    .slice(0, Math.min(config.questionCount, ordered.length))
+    .map(randomizeQuestionOptions)
 }
