@@ -34,6 +34,11 @@ type Props = {
   locale: 'es' | 'en'
 }
 
+type StoredProps = {
+  storageKey: string
+  locale: 'es' | 'en'
+}
+
 function scorePoints(attempt: StoredExamAttempt) {
   return attempt.estimatedPoints ?? Math.round(attempt.percentage * 10)
 }
@@ -115,4 +120,41 @@ export default function SimulatorHistory({ attempts, locale }: Props) {
         </>}
     </section>}
   </section>
+}
+
+export function StoredSimulatorHistory({ storageKey, locale }: StoredProps) {
+  const [open, setOpen] = useState(false)
+  const [attempts, setAttempts] = useState<StoredExamAttempt[]>([])
+  const spanish = locale === 'es'
+
+  function openHistory() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as { examAttempts?: StoredExamAttempt[] }
+      setAttempts(Array.isArray(stored.examAttempts) ? stored.examAttempts : [])
+    } catch {
+      setAttempts([])
+    }
+    setOpen(true)
+  }
+
+  return <>
+    <button className="history-floating-button" onClick={openHistory} aria-label={spanish ? 'Abrir historial de simuladores' : 'Open mock-exam history'}>
+      <span aria-hidden="true">▤</span>
+      {spanish ? 'Historial simuladores' : 'Mock history'}
+    </button>
+    {open && <div className="history-overlay" role="dialog" aria-modal="true" aria-label={spanish ? 'Historial de simuladores' : 'Mock-exam history'} onClick={() => setOpen(false)}>
+      <aside className="history-drawer" onClick={(event) => event.stopPropagation()}>
+        <div className="history-drawer-header">
+          <div>
+            <span className="eyebrow">{spanish ? 'SIMULADORES' : 'MOCK EXAMS'}</span>
+            <h2>{spanish ? 'Historial de respuestas' : 'Answer history'}</h2>
+          </div>
+          <button className="secondary" onClick={() => setOpen(false)}>{spanish ? 'Cerrar' : 'Close'}</button>
+        </div>
+        {attempts.length
+          ? <SimulatorHistory attempts={attempts} locale={locale} />
+          : <p className="empty-review">{spanish ? 'Todavía no hay simuladores completados en este dispositivo.' : 'No completed mock exams are stored on this device yet.'}</p>}
+      </aside>
+    </div>}
+  </>
 }
