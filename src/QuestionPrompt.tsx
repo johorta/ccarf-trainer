@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Question } from './data'
 
 type Props = {
@@ -110,7 +111,7 @@ export default function QuestionPrompt({ question }: Props) {
   })
 
   const terms = [...translations.keys()].sort((a, b) => b.length - a.length)
-  const nodes: React.ReactNode[] = []
+  const nodes: ReactNode[] = []
   let cursor = 0
   let textStart = 0
 
