@@ -65,9 +65,9 @@ function buildQuestionBank(questionSources: Question[][]): Question[] {
 
 function fullQuestionBank(questions: Question[]): Question[] {
   return buildQuestionBank([
-    questions,
     challengingQuestionBank,
     applicationQuestionBank,
+    questions,
     extraExamQuestions,
     finalExamQuestions,
     expandedQuestionBank,
@@ -124,7 +124,8 @@ export function buildExam(
     .map(randomizeQuestionOptions)
 }
 
-// Practice uses the complete bank too. Answer positions are randomized once per
-// page load, removing fixed-letter clues while keeping explanations aligned.
+// Practice uses the complete bank too. The higher-quality scenario banks are
+// placed first so equal-priority topics show realistic distractors before the
+// older short-form drills. Answer positions are randomized once per page load.
 const randomizedPracticeBank = fullQuestionBank(sharedPracticeQuestions).map(randomizeQuestionOptions)
 sharedPracticeQuestions.splice(0, sharedPracticeQuestions.length, ...randomizedPracticeBank)
