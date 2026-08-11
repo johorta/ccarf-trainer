@@ -9,6 +9,7 @@ import { StoredSimulatorHistory } from './SimulatorHistory'
 import './styles.css'
 import './course.css'
 import './exams.css'
+import './question-translation.css'
 import './transfer.css'
 
 registerSW({ immediate: true })
