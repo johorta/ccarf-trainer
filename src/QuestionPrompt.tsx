@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Question } from './data'
 
 type Props = {
@@ -104,6 +104,7 @@ function canMatch(prompt: string, start: number, term: string) {
 }
 
 export default function QuestionPrompt({ question }: Props) {
+  const [activeToken, setActiveToken] = useState<string | null>(null)
   const translations = new Map<string, string>()
   Object.entries(contextualTerms).forEach(([term, translation]) => translations.set(term.toLowerCase(), translation))
   Object.entries(question.vocabulary ?? {}).forEach(([term, translation]) => {
@@ -114,6 +115,7 @@ export default function QuestionPrompt({ question }: Props) {
   const nodes: ReactNode[] = []
   let cursor = 0
   let textStart = 0
+  let translatedTerms = 0
 
   while (cursor < question.prompt.length) {
     const match = terms.find((term) => canMatch(question.prompt, cursor, term))
@@ -125,21 +127,29 @@ export default function QuestionPrompt({ question }: Props) {
     if (textStart < cursor) nodes.push(question.prompt.slice(textStart, cursor))
     const original = question.prompt.slice(cursor, cursor + match.length)
     const translation = translations.get(match)!
+    const tokenKey = `${cursor}-${match}`
+    translatedTerms += 1
     nodes.push(
-      <span
-        className="translation-token"
+      <button
+        type="button"
+        className={`translation-token ${activeToken === tokenKey ? 'active' : ''}`}
         data-translation={translation}
-        tabIndex={0}
-        key={`${cursor}-${match}`}
+        key={tokenKey}
         aria-label={`${original}: ${translation}`}
+        aria-pressed={activeToken === tokenKey}
+        onClick={() => setActiveToken((current) => current === tokenKey ? null : tokenKey)}
       >
         {original}
-      </span>,
+      </button>,
     )
     cursor += match.length
     textStart = cursor
   }
 
   if (textStart < question.prompt.length) nodes.push(question.prompt.slice(textStart))
-  return <>{nodes}</>
+
+  return <>
+    <span className="translated-question-text">{nodes}</span>
+    {translatedTerms > 0 && <span className="translation-hint">🌐 Toca las palabras subrayadas para ver su significado en español.</span>}
+  </>
 }
