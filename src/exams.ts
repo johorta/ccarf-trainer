@@ -1,4 +1,6 @@
 import { questions as sharedPracticeQuestions, type Question } from './data'
+import { applicationQuestionBank } from './applicationQuestionBank'
+import { challengingQuestionBank } from './challengingQuestionBank'
 import { expandedQuestionBank } from './expandedQuestionBank'
 import { extraExamQuestions } from './extraExamQuestions'
 import { finalExamQuestions } from './finalExamQuestions'
@@ -62,7 +64,14 @@ function buildQuestionBank(questionSources: Question[][]): Question[] {
 }
 
 function fullQuestionBank(questions: Question[]): Question[] {
-  return buildQuestionBank([questions, extraExamQuestions, finalExamQuestions, expandedQuestionBank])
+  return buildQuestionBank([
+    questions,
+    challengingQuestionBank,
+    applicationQuestionBank,
+    extraExamQuestions,
+    finalExamQuestions,
+    expandedQuestionBank,
+  ])
 }
 
 function balancedRandomOrder(questions: Question[]): Question[] {
@@ -105,8 +114,6 @@ export function buildExam(
   const unseenQuestions = questionBank.filter((question) => !excluded.has(question.id))
   const previouslySeenQuestions = questionBank.filter((question) => excluded.has(question.id))
 
-  // Consume unseen questions first. Reuse older questions only when the level's
-  // available pool is no longer large enough to assemble a complete attempt.
   const ordered = [
     ...balancedRandomOrder(unseenQuestions),
     ...balancedRandomOrder(previouslySeenQuestions),
@@ -117,8 +124,7 @@ export function buildExam(
     .map(randomizeQuestionOptions)
 }
 
-// Practice mode imports the original `questions` array directly. Hydrate that
-// shared array once with the complete bank and randomize answer positions so
-// practice is not biased toward any fixed letter such as B.
+// Practice uses the complete bank too. Answer positions are randomized once per
+// page load, removing fixed-letter clues while keeping explanations aligned.
 const randomizedPracticeBank = fullQuestionBank(sharedPracticeQuestions).map(randomizeQuestionOptions)
 sharedPracticeQuestions.splice(0, sharedPracticeQuestions.length, ...randomizedPracticeBank)
