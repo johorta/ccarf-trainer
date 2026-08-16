@@ -4,6 +4,7 @@ import { challengingQuestionBank } from './challengingQuestionBank'
 import { expandedQuestionBank } from './expandedQuestionBank'
 import { extraExamQuestions } from './extraExamQuestions'
 import { finalExamQuestions } from './finalExamQuestions'
+import { realisticQuestionBank } from './realisticQuestionBank'
 
 export type ExamConfig = {
   id: string
@@ -11,7 +12,7 @@ export type ExamConfig = {
   description: string
   questionCount: number
   durationMinutes: number
-  difficulty: 'Foundation' | 'Intermediate' | 'Advanced' | 'Final'
+  difficulty: 'Foundation' | 'Intermediate' | 'Advanced' | 'Final' | 'Realistic'
 }
 
 export const examConfigs: ExamConfig[] = [
@@ -19,6 +20,7 @@ export const examConfigs: ExamConfig[] = [
   { id: 'intermediate', title: 'Mock Exam 2 — Intermediate', description: 'Escenarios mixtos con distractores más cercanos al examen.', questionCount: 60, durationMinutes: 90, difficulty: 'Intermediate' },
   { id: 'advanced', title: 'Mock Exam 3 — Advanced', description: 'Preguntas de aplicación, arquitectura y selección de la mejor alternativa.', questionCount: 60, durationMinutes: 90, difficulty: 'Advanced' },
   { id: 'final', title: 'Mock Exam 4 — Final Readiness', description: 'Simulador final con todos los dominios y prioridad en temas débiles.', questionCount: 60, durationMinutes: 90, difficulty: 'Final' },
+  { id: 'realistic', title: 'Mock Exam 5 — Realistic / Hard', description: '60 escenarios largos con distractores plausibles, causas raíz y trade-offs similares a los mocks más difíciles.', questionCount: 60, durationMinutes: 120, difficulty: 'Realistic' },
 ]
 
 function stableHash(value: string) {
@@ -65,6 +67,7 @@ function buildQuestionBank(questionSources: Question[][]): Question[] {
 
 function fullQuestionBank(questions: Question[]): Question[] {
   return buildQuestionBank([
+    realisticQuestionBank,
     challengingQuestionBank,
     applicationQuestionBank,
     questions,
@@ -109,7 +112,9 @@ export function buildExam(
   questions: Question[],
   excludedQuestionIds: string[] = [],
 ): Question[] {
-  const questionBank = getExamQuestionPool(questions)
+  const questionBank = config.id === 'realistic'
+    ? buildQuestionBank([realisticQuestionBank])
+    : getExamQuestionPool(questions)
   const excluded = new Set(excludedQuestionIds)
   const unseenQuestions = questionBank.filter((question) => !excluded.has(question.id))
   const previouslySeenQuestions = questionBank.filter((question) => excluded.has(question.id))
@@ -124,8 +129,8 @@ export function buildExam(
     .map(randomizeQuestionOptions)
 }
 
-// Practice uses the complete bank too. The higher-quality scenario banks are
-// placed first so equal-priority topics show realistic distractors before the
-// older short-form drills. Answer positions are randomized once per page load.
+// Practice uses the complete bank too. The realistic and higher-quality scenario
+// banks are placed first so equal-priority topics surface exam-like distractors
+// before older short-form drills. Answer positions are randomized once per page load.
 const randomizedPracticeBank = fullQuestionBank(sharedPracticeQuestions).map(randomizeQuestionOptions)
 sharedPracticeQuestions.splice(0, sharedPracticeQuestions.length, ...randomizedPracticeBank)
